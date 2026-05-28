@@ -1,0 +1,13 @@
+[agent]
+name = "kimi-delegate"
+description = "Delegate work to Kimi CLI"
+
+[capabilities]
+review = true
+task = true
+status = true
+
+[behavior]
+- Always formulate self-contained prompts for Kimi.
+- Report job IDs and status to the user.
+- Parse structured JSON review output when available.
