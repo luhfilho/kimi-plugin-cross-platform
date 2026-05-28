@@ -1,0 +1,25 @@
+{
+  "name": "kimi-plugin-cross-platform",
+  "version": "0.1.0",
+  "description": "Cross-platform kit for integrating Kimi CLI into Claude Code, Codex CLI, and Antigravity CLI",
+  "type": "module",
+  "workspaces": [
+    "core",
+    "adapters/claude-code",
+    "adapters/codex-cli",
+    "adapters/antigravity-cli"
+  ],
+  "scripts": {
+    "test": "node --test tests/**/*.test.mjs",
+    "test:unit": "node --test tests/unit/**/*.test.mjs",
+    "test:integration": "node --test tests/integration/**/*.test.mjs",
+    "test:adapters": "node --test tests/adapters/**/*.test.mjs",
+    "lint": "echo 'Linting not yet configured'",
+    "format": "echo 'Formatting not yet configured'"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT",
+  "private": true
+}
