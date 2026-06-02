@@ -3,7 +3,7 @@
  * Kimi Plugin Cross-Platform Kit — Instalador Automatizado
  *
  * Instala o plugin nos 3 CLIs suportados:
- * - Claude Code: ~/.claude/plugins/kimi/
+ * - Claude Code: ~/.claude/skills/kimi/
  * - Codex CLI: ~/.codex/
  * - Antigravity CLI: ~/.antigravity/
  *
@@ -66,20 +66,27 @@ function detectCodexCLI() {
 }
 
 function detectAntigravityCLI() {
-  try {
-    execFileSync("antigravity", ["--version"], { stdio: "pipe" });
-    return { installed: true, path: "antigravity" };
-  } catch {
+  for (const command of ["agy", "antigravity"]) {
     try {
-      const globalPath = execSync("npm root -g", { encoding: "utf8" }).trim();
-      const agBin = join(globalPath, ".bin", "antigravity");
+      execFileSync(command, ["--version"], { stdio: "pipe" });
+      return { installed: true, path: command };
+    } catch {
+      // try the next command name
+    }
+  }
+
+  try {
+    const globalPath = execSync("npm root -g", { encoding: "utf8" }).trim();
+    for (const command of ["agy", "antigravity"]) {
+      const agBin = join(globalPath, ".bin", command);
       if (existsSync(agBin)) {
         return { installed: true, path: agBin };
       }
-    } catch {
-      // ignore
     }
+  } catch {
+    // ignore
   }
+
   return { installed: false };
 }
 
@@ -103,9 +110,62 @@ function copyRecursive(src, dst, dryRun) {
   cpSync(src, dst, { recursive: true, force: true });
 }
 
+function rewriteCompanionCorePath(companion, replacement) {
+  if (!existsSync(companion)) {
+    return;
+  }
+
+  let content = readFileSync(companion, "utf8");
+  content = content.replace(
+    'const CORE_SRC = join(__dirname, "../../../../../core/src");',
+    replacement
+  );
+  writeFileSync(companion, content);
+  chmodSync(companion, 0o755);
+}
+
+function installSharedRuntime(dryRun) {
+  const home = getHomeDir();
+  const runtimeDir = join(home, ".kimi-plugin");
+
+  if (dryRun) {
+    console.log(`  [DRY-RUN] Would install shared runtime: ${runtimeDir}`);
+    return;
+  }
+
+  ensureDir(runtimeDir);
+
+  const companion = join(runtimeDir, "kimi-companion.mjs");
+  copyRecursive(
+    join(REPO_ROOT, "adapters", "claude-code", "plugins", "kimi", "scripts", "kimi-companion.mjs"),
+    companion,
+    false
+  );
+
+  const coreDst = join(runtimeDir, "core");
+  ensureDir(coreDst);
+  copyRecursive(join(REPO_ROOT, "core", "src"), coreDst, false);
+  rewriteCompanionCorePath(companion, 'const CORE_SRC = join(__dirname, "core");');
+}
+
+function registerAntigravityPlugin(src) {
+  for (const command of ["agy", "antigravity"]) {
+    try {
+      execFileSync(command, ["plugin", "install", src], { stdio: "pipe" });
+      console.log(`   ✅ Antigravity plugin registered via ${command}.`);
+      return true;
+    } catch {
+      // try the next command name
+    }
+  }
+
+  console.log("   ⚠️  Antigravity plugin files copied, but plugin registration failed.");
+  return false;
+}
+
 function installClaudeCode(dryRun) {
   const home = getHomeDir();
-  const pluginDir = join(home, ".claude", "plugins", "kimi");
+  const pluginDir = join(home, ".claude", "skills", "kimi");
 
   console.log("\n📦 Installing Claude Code adapter...");
   console.log(`   Target: ${pluginDir}`);
@@ -127,15 +187,7 @@ function installClaudeCode(dryRun) {
 
   // Fix companion import path to use bundled core
   const companion = join(pluginDir, "scripts", "kimi-companion.mjs");
-  if (existsSync(companion)) {
-    let content = readFileSync(companion, "utf8");
-    content = content.replace(
-      'const CORE_SRC = join(__dirname, "../../../../../core/src");',
-      'const CORE_SRC = join(__dirname, "../core");'
-    );
-    writeFileSync(companion, content);
-    chmodSync(companion, 0o755);
-  }
+  rewriteCompanionCorePath(companion, 'const CORE_SRC = join(__dirname, "../core");');
 
   console.log("   ✅ Claude Code adapter installed.");
   console.log(`   Reload with: /reload-plugins`);
@@ -173,6 +225,8 @@ function installCodexCLI(dryRun) {
     false
   );
 
+  installSharedRuntime(false);
+
   console.log("   ✅ Codex CLI adapter installed.");
   console.log(`   Skills available: kimi-review, kimi-rescue, kimi-code, kimi-status, kimi-prompting`);
   return true;
@@ -181,6 +235,7 @@ function installCodexCLI(dryRun) {
 function installAntigravityCLI(dryRun) {
   const home = getHomeDir();
   const agDir = join(home, ".antigravity");
+  const src = join(REPO_ROOT, "adapters", "antigravity-cli");
 
   console.log("\n📦 Installing Antigravity CLI adapter...");
   console.log(`   Target: ${agDir}`);
@@ -191,11 +246,12 @@ function installAntigravityCLI(dryRun) {
   }
 
   ensureDir(agDir);
+  copyRecursive(join(src, "plugin.json"), join(agDir, "plugin.json"), false);
 
   const rulesDir = join(agDir, "rules");
   ensureDir(rulesDir);
   copyRecursive(
-    join(REPO_ROOT, "adapters", "antigravity-cli", "rules"),
+    join(src, "rules"),
     rulesDir,
     false
   );
@@ -203,21 +259,32 @@ function installAntigravityCLI(dryRun) {
   const skillsDir = join(agDir, "skills");
   ensureDir(skillsDir);
   copyRecursive(
-    join(REPO_ROOT, "adapters", "antigravity-cli", "skills"),
+    join(src, "skills"),
     skillsDir,
+    false
+  );
+
+  const commandsDir = join(agDir, "commands");
+  ensureDir(commandsDir);
+  copyRecursive(
+    join(src, "commands"),
+    commandsDir,
     false
   );
 
   const workflowsDir = join(agDir, "workflows");
   ensureDir(workflowsDir);
   copyRecursive(
-    join(REPO_ROOT, "adapters", "antigravity-cli", "workflows"),
+    join(src, "workflows"),
     workflowsDir,
     false
   );
 
+  installSharedRuntime(false);
+  registerAntigravityPlugin(src);
+
   console.log("   ✅ Antigravity CLI adapter installed.");
-  console.log(`   Workflows available: kimi-setup, kimi-review, kimi-rescue, kimi-code, kimi-status, kimi-result, kimi-cancel`);
+  console.log(`   Commands available: /kimi-setup, /kimi-review, /kimi-rescue, /kimi-code, /kimi-status, /kimi-result, /kimi-cancel`);
   return true;
 }
 
@@ -297,7 +364,7 @@ function getUninstallTargets() {
   const home = getHomeDir();
   return {
     claude: [
-      join(home, ".claude", "plugins", "kimi"),
+      join(home, ".claude", "skills", "kimi"),
     ],
     codex: [
       join(home, ".codex", "agents", "kimi-delegate.toml"),
@@ -309,7 +376,15 @@ function getUninstallTargets() {
       join(home, ".codex", "skills", "kimi-prompting"),
     ],
     antigravity: [
+      join(home, ".antigravity", "plugin.json"),
       join(home, ".antigravity", "rules", "kimi-plugin.md"),
+      join(home, ".antigravity", "commands", "kimi-setup.md"),
+      join(home, ".antigravity", "commands", "kimi-review.md"),
+      join(home, ".antigravity", "commands", "kimi-rescue.md"),
+      join(home, ".antigravity", "commands", "kimi-code.md"),
+      join(home, ".antigravity", "commands", "kimi-status.md"),
+      join(home, ".antigravity", "commands", "kimi-result.md"),
+      join(home, ".antigravity", "commands", "kimi-cancel.md"),
       join(home, ".antigravity", "skills", "kimi-review"),
       join(home, ".antigravity", "skills", "kimi-rescue"),
       join(home, ".antigravity", "skills", "kimi-code"),
@@ -321,6 +396,9 @@ function getUninstallTargets() {
       join(home, ".antigravity", "workflows", "kimi-status.md"),
       join(home, ".antigravity", "workflows", "kimi-result.md"),
       join(home, ".antigravity", "workflows", "kimi-cancel.md"),
+    ],
+    shared: [
+      join(home, ".kimi-plugin"),
     ],
   };
 }
@@ -409,7 +487,7 @@ async function main() {
       console.log("   Codex CLI:    codex --agent kimi-delegate");
     }
     if (antigravity.installed) {
-      console.log("   Antigravity:  ag run kimi-setup");
+      console.log('   Antigravity:  agy -p "/kimi-setup"');
     }
   }
 }

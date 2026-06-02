@@ -61,7 +61,8 @@ test("Codex Kimi code skill and programmer agent are installed artifacts", () =>
   const skill = readFileSync(join(codexAdapterRoot, "skills/kimi-code/SKILL.md"), "utf8");
   assert.match(skill, /^---\nname: kimi-code\n/m);
   assert.match(skill, /plan first/i);
-  assert.match(skill, /kimi-companion\.mjs code/);
+  assert.match(skill, /\.kimi-plugin\/kimi-companion\.mjs/);
+  assert.match(skill, / code /);
 
   const agent = readFileSync(join(codexAdapterRoot, "agents/kimi-programmer.toml"), "utf8");
   assert.match(agent, /name = "kimi-programmer"/);

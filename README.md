@@ -80,12 +80,13 @@ node scripts/install.mjs --uninstall --antigravity
 
 | Host | Installed assets | Target |
 |---|---|---|
-| Claude Code | Plugin, commands, agents, skills, hooks, companion script, copied core runtime | `~/.claude/plugins/kimi` |
-| Codex CLI | Skills and agent roles | `~/.codex/skills`, `~/.codex/agents` |
-| Antigravity CLI | Rules, skills, workflows | `~/.antigravity` |
+| Claude Code | Plugin, commands, agents, skills, hooks, companion script, copied core runtime | `~/.claude/skills/kimi` |
+| Codex CLI | Skills, agent roles, shared companion runtime | `~/.codex/skills`, `~/.codex/agents`, `~/.kimi-plugin` |
+| Antigravity CLI | Registered `agy` plugin, commands, skills, workflows, shared companion runtime | `~/.gemini/config/plugins/kimi`, `~/.antigravity`, `~/.kimi-plugin` |
 
 The Claude Code installer also copies `core/src` into the installed plugin and
 rewrites the companion's core import path so it works outside this repository.
+Codex and Antigravity use the shared runtime at `~/.kimi-plugin/kimi-companion.mjs`.
 
 ## Host Workflows
 
@@ -129,13 +130,22 @@ with YAML frontmatter containing `name` and `description`.
 
 Installed Antigravity assets:
 
-- rule: `kimi-plugin.md`
+- registered plugin: `kimi`
+- commands:
+  - `/kimi-setup`
+  - `/kimi-review`
+  - `/kimi-rescue`
+  - `/kimi-code`
+  - `/kimi-status`
+  - `/kimi-result`
+  - `/kimi-cancel`
+- rule copy: `kimi-plugin.md`
 - skills:
   - `kimi-review`
   - `kimi-rescue`
   - `kimi-code`
   - `kimi-status`
-- workflows:
+- workflow copies:
   - `kimi-setup`
   - `kimi-review`
   - `kimi-rescue`

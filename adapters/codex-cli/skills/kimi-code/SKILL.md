@@ -20,7 +20,7 @@ Use this when the user wants Kimi to implement code from Codex.
 4. Run:
 
 ```bash
-node path/to/kimi-companion.mjs code "<self-contained implementation plan>"
+node "$HOME/.kimi-plugin/kimi-companion.mjs" code "<self-contained implementation plan>"
 ```
 
 5. Inspect Kimi's output and resulting diff.

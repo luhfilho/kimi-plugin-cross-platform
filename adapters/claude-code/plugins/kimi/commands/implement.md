@@ -9,5 +9,5 @@ Use this command as an alias for `/kimi:code`.
 Workflow:
 
 1. Plan with Claude Code's native model.
-2. Invoke `kimi-companion.mjs implement "<self-contained implementation plan>"`.
+2. Invoke `node "$HOME/.claude/skills/kimi/scripts/kimi-companion.mjs" implement "<self-contained implementation plan>"`.
 3. Review the diff and verification output before final response.

@@ -1,28 +1,6 @@
 {
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "kimi",
   "version": "0.1.0",
-  "description": "Delegate work to Kimi CLI (Moonshot AI) for code review, rescue tasks, and more.",
-  "commands": [
-    "commands/review.md",
-    "commands/adversarial-review.md",
-    "commands/rescue.md",
-    "commands/status.md",
-    "commands/result.md",
-    "commands/cancel.md",
-    "commands/setup.md"
-  ],
-  "agents": [
-    "agents/kimi-rescue.md"
-  ],
-  "skills": [
-    "skills/kimi-cli-runtime/SKILL.md",
-    "skills/kimi-result-handling/SKILL.md",
-    "skills/kimi-prompting/SKILL.md"
-  ],
-  "hooks": [
-    "hooks/hooks.json"
-  ],
-  "scripts": [
-    "scripts/kimi-companion.mjs"
-  ]
+  "description": "Delegate work to Kimi CLI (Moonshot AI) for code review, rescue tasks, and Kimi Code implementation."
 }

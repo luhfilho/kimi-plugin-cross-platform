@@ -20,7 +20,7 @@ kimi --wire < <(echo '{"jsonrpc":"2.0","id":"1","method":"prompt","params":{"use
 Or use the companion script if installed:
 
 ```bash
-node path/to/kimi-companion.mjs review
+node "$HOME/.kimi-plugin/kimi-companion.mjs" review
 ```
 
 ## Rules
