@@ -65,6 +65,18 @@ test("parseCodeResult prefers result JSON over earlier unrelated objects", () =>
   assert.deepEqual(parsed.followUp, []);
 });
 
+test("parseCodeResult preserves unrelated JSON as raw fallback", () => {
+  for (const raw of ["{\"exitCode\":0}", "noise {\"exitCode\":0}"]) {
+    const parsed = parseCodeResult(raw);
+
+    assert.equal(parsed.summary, raw);
+    assert.deepEqual(parsed.changedFiles, []);
+    assert.deepEqual(parsed.verification, []);
+    assert.deepEqual(parsed.followUp, []);
+    assert.equal(parsed.raw, raw);
+  }
+});
+
 test("parseCodeResult preserves plain text as raw fallback", () => {
   const parsed = parseCodeResult("Implemented the change and tests passed.");
 

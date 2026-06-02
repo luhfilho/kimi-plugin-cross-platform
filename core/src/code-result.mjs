@@ -62,7 +62,7 @@ function parseStructuredOutput(text) {
   }
 
   const direct = tryParseJsonObject(trimmed);
-  if (direct) {
+  if (direct && isCodeResultShape(direct)) {
     return direct;
   }
 
@@ -123,17 +123,15 @@ function parseObjectSubstrings(text) {
 }
 
 function selectJsonCandidate(candidates) {
-  let firstCandidate = null;
   let lastContractCandidate = null;
 
   for (const candidate of candidates) {
-    firstCandidate ??= candidate;
     if (isCodeResultShape(candidate)) {
       lastContractCandidate = candidate;
     }
   }
 
-  return lastContractCandidate ?? firstCandidate;
+  return lastContractCandidate;
 }
 
 function isCodeResultShape(value) {
