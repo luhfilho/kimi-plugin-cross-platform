@@ -22,6 +22,7 @@ export class WireClient extends EventTarget {
    * @param {string} opts.command — executable to spawn (e.g. "kimi")
    * @param {string[]} [opts.args] — arguments (e.g. ["--wire"])
    * @param {NodeJS.ProcessEnv} [opts.env] — environment overrides
+   * @param {string} [opts.cwd] — working directory for the subprocess
    * @param {number} [opts.initTimeoutMs=30000] — initialize timeout
    * @param {number} [opts.promptTimeoutMs=0] — 0 = no timeout
    */
@@ -30,6 +31,12 @@ export class WireClient extends EventTarget {
     this._command = opts.command;
     this._args = opts.args || [];
     this._env = opts.env || process.env;
+    this._cwd = opts.cwd || opts.workDir || undefined;
+    this._capabilities = opts.capabilities || { supports_question: false, supports_plan_mode: false };
+    this._externalTools = opts.externalTools || opts.external_tools || [];
+    this._hooks = opts.hooks || [];
+    this._requestHandler = opts.requestHandler || null;
+    this._initializeParams = null;
     this._initTimeoutMs = opts.initTimeoutMs ?? 30000;
     this._promptTimeoutMs = opts.promptTimeoutMs ?? 0;
 
@@ -58,6 +65,14 @@ export class WireClient extends EventTarget {
     return this._streaming;
   }
 
+  get cwd() {
+    return this._cwd;
+  }
+
+  get initializeParams() {
+    return this._initializeParams;
+  }
+
   /**
    * Convenience alias for addEventListener, matching EventEmitter style.
    * @param {string} type
@@ -78,6 +93,7 @@ export class WireClient extends EventTarget {
     }
 
     this._proc = spawn(this._command, this._args, {
+      cwd: this._cwd,
       env: this._env,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -112,15 +128,22 @@ export class WireClient extends EventTarget {
 
     // Send initialize
     const initId = this._makeId();
+    this._initializeParams = {
+      protocol_version: "1.10",
+      client: { name: "kimi-plugin-cross-platform", version: "0.1.0" },
+      capabilities: this._capabilities,
+    };
+    if (this._externalTools.length > 0) {
+      this._initializeParams.external_tools = this._externalTools;
+    }
+    if (this._hooks.length > 0) {
+      this._initializeParams.hooks = this._hooks;
+    }
     const initPromise = this._request(initId, {
       jsonrpc: "2.0",
       id: initId,
       method: "initialize",
-      params: {
-        protocol_version: "1.10",
-        client: { name: "kimi-plugin-cross-platform", version: "0.1.0" },
-        capabilities: { supports_question: false, supports_plan_mode: false },
-      },
+      params: this._initializeParams,
     });
 
     const result = await this._withTimeout(initPromise, this._initTimeoutMs, "initialize timeout");
@@ -365,8 +388,7 @@ export class WireClient extends EventTarget {
     if (msg.method === "request") {
       const envelope = msg.params;
       this.dispatchEvent(new CustomEvent("request", { detail: envelope }));
-      // Auto-respond to simple requests to avoid hanging
-      this._autoRespond(msg.id, envelope);
+      this._respondToServerRequest(msg.id, envelope);
       return;
     }
 
@@ -376,6 +398,33 @@ export class WireClient extends EventTarget {
         detail: new Error(`Unexpected message: ${line}`),
       })
     );
+  }
+
+  async _respondToServerRequest(requestId, envelope) {
+    if (this._requestHandler) {
+      try {
+        const result = await this._requestHandler(envelope, requestId, this);
+        if (result !== undefined) {
+          this._sendRaw({
+            jsonrpc: "2.0",
+            id: requestId,
+            result,
+          });
+          return;
+        }
+      } catch (err) {
+        this._sendRaw({
+          jsonrpc: "2.0",
+          id: requestId,
+          error: {
+            code: -32000,
+            message: err?.message || "Request handler failed",
+          },
+        });
+        return;
+      }
+    }
+    this._autoRespond(requestId, envelope);
   }
 
   _autoRespond(requestId, envelope) {

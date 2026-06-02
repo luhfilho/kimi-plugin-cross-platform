@@ -39,6 +39,44 @@ describe("WireClient", () => {
       assert.equal(info.server.name, "fake-kimi");
     });
 
+    it("WireClient passes cwd and custom initialize params", async () => {
+      const testsDir = join(__dirname, "..");
+      const capabilities = { supports_question: true, supports_plan_mode: false };
+      const externalTools = [
+        { name: "open_in_ide", description: "Open a file in the editor" },
+      ];
+      const initializeEvents = [];
+
+      client = new WireClient({
+        command: "node",
+        args: ["fixtures/fake-kimi.mjs"],
+        cwd: testsDir,
+        env: {
+          ...process.env,
+          FAKE_KIMI_BEHAVIOR: "task-complete",
+          FAKE_KIMI_ECHO_INITIALIZE: "1",
+        },
+        capabilities,
+        externalTools,
+        requestHandler: () => undefined,
+      });
+      client.on("event", (evt) => initializeEvents.push(evt.detail));
+
+      await client.connect();
+
+      assert.equal(client.cwd, testsDir);
+      assert.equal(client.initializeParams.capabilities.supports_question, true);
+      assert.equal(client.initializeParams.external_tools[0].name, "open_in_ide");
+
+      const echoedInitialize = initializeEvents.find(
+        (evt) => evt.type === "ContentPart" && evt.payload?.text?.includes("\"initialize\"")
+      );
+      assert.ok(echoedInitialize);
+      const echoed = JSON.parse(echoedInitialize.payload.text);
+      assert.equal(echoed.initialize.capabilities.supports_question, true);
+      assert.equal(echoed.initialize.external_tools[0].name, "open_in_ide");
+    });
+
     it("should throw on double connect", async () => {
       client = makeClient();
       await client.connect();
@@ -104,6 +142,43 @@ describe("WireClient", () => {
       await client.cancel();
       const result = await p;
       assert.equal(result.status, "cancelled");
+    });
+
+    it("WireClient custom request handler can reject approvals", async () => {
+      const requests = [];
+      const sentMessages = [];
+      client = makeClient("approval-required", {
+        delayMs: 5,
+        requestHandler: async (envelope) => {
+          requests.push(envelope);
+          if (envelope.type === "ApprovalRequest") {
+            return {
+              request_id: envelope.payload.id,
+              response: "reject",
+              feedback: "Rejected by test handler",
+            };
+          }
+          return undefined;
+        },
+      });
+      const sendRaw = client._sendRaw.bind(client);
+      client._sendRaw = (msg) => {
+        sentMessages.push(msg);
+        sendRaw(msg);
+      };
+
+      await client.connect();
+      const result = await client.prompt("Write a file");
+
+      assert.equal(result.status, "finished");
+      assert.equal(requests.length, 1);
+      assert.equal(requests[0].type, "ApprovalRequest");
+      assert.equal(requests[0].payload.id, "approval-1");
+      assert.ok(
+        sentMessages.some(
+          (msg) => msg.result?.request_id === "approval-1" && msg.result?.response === "reject"
+        )
+      );
     });
 
     it("should reject cancel when not streaming", async () => {

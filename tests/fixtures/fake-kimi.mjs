@@ -9,6 +9,7 @@
  *   - "review-ok"        : Returns clean review (no findings)
  *   - "review-findings"  : Returns review with structured findings
  *   - "task-complete"    : Returns task output
+ *   - "approval-required": Sends an approval request before task output
  *   - "auth-required"    : Returns AUTH_EXPIRED on prompt
  *   - "network-error"    : Exits immediately
  *   - "slow"             : Emits events slowly
@@ -70,6 +71,9 @@ async function handleInitialize(msg) {
     return;
   }
   initialized = true;
+  if (process.env.FAKE_KIMI_ECHO_INITIALIZE === "1") {
+    sendEvent("ContentPart", { type: "text", text: JSON.stringify({ initialize: msg.params }) });
+  }
   sendSuccess(msg.id, {
     protocol_version: "1.10",
     server: { name: "fake-kimi", version: "0.0.1" },
@@ -101,7 +105,18 @@ async function handlePrompt(msg) {
   sendEvent("TurnBegin", { user_input: userInput });
   await delay(DELAY_MS);
 
-  if (BEHAVIOR === "review-ok") {
+  if (BEHAVIOR === "approval-required") {
+    sendRequest("ApprovalRequest", {
+      id: "approval-1",
+      tool_call_id: "tc-1",
+      sender: "Write",
+      action: "write file",
+      description: "Write file README.md",
+      display: [],
+    });
+    await delay(DELAY_MS);
+    sendEvent("ContentPart", { type: "text", text: "Approval request handled." });
+  } else if (BEHAVIOR === "review-ok") {
     sendEvent("ContentPart", { type: "text", text: "No issues found. Code looks clean!" });
   } else if (BEHAVIOR === "review-findings") {
     sendEvent("ContentPart", {
