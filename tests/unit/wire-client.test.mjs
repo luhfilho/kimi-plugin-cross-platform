@@ -10,14 +10,32 @@ const __dirname = dirname(__filename);
 const FAKE_KIMI = join(__dirname, "../fixtures/fake-kimi.mjs");
 
 function makeClient(behavior = "task-complete", opts = {}) {
-  const env = { ...process.env, FAKE_KIMI_BEHAVIOR: behavior };
-  if (opts.delayMs) env.FAKE_KIMI_DELAY_MS = String(opts.delayMs);
+  const { delayMs, env: envOverrides, ...clientOpts } = opts;
+  const env = { ...process.env, FAKE_KIMI_BEHAVIOR: behavior, ...envOverrides };
+  if (delayMs) env.FAKE_KIMI_DELAY_MS = String(delayMs);
   return new WireClient({
     command: "node",
     args: [FAKE_KIMI],
     env,
-    ...opts,
+    ...clientOpts,
   });
+}
+
+function findJsonContent(events, key) {
+  for (const event of events) {
+    if (event.type !== "ContentPart" || typeof event.payload?.text !== "string") {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(event.payload.text);
+      if (parsed && Object.hasOwn(parsed, key)) {
+        return parsed[key];
+      }
+    } catch {
+      // Ignore non-JSON content parts.
+    }
+  }
+  return null;
 }
 
 describe("WireClient", () => {
@@ -37,6 +55,44 @@ describe("WireClient", () => {
       const info = await client.connect();
       assert.equal(info.protocol_version, "1.10");
       assert.equal(info.server.name, "fake-kimi");
+    });
+
+    it("WireClient passes cwd and custom initialize params", async () => {
+      const testsDir = join(__dirname, "..");
+      const capabilities = { supports_question: true, supports_plan_mode: false };
+      const externalTools = [
+        { name: "open_in_ide", description: "Open a file in the editor" },
+      ];
+      const initializeEvents = [];
+
+      client = new WireClient({
+        command: "node",
+        args: ["fixtures/fake-kimi.mjs"],
+        cwd: testsDir,
+        env: {
+          ...process.env,
+          FAKE_KIMI_BEHAVIOR: "task-complete",
+          FAKE_KIMI_ECHO_INITIALIZE: "1",
+        },
+        capabilities,
+        externalTools,
+        requestHandler: () => undefined,
+      });
+      client.on("event", (evt) => initializeEvents.push(evt.detail));
+
+      await client.connect();
+
+      assert.equal(client.cwd, testsDir);
+      assert.equal(client.initializeParams.capabilities.supports_question, true);
+      assert.equal(client.initializeParams.external_tools[0].name, "open_in_ide");
+
+      const echoedInitialize = initializeEvents.find(
+        (evt) => evt.type === "ContentPart" && evt.payload?.text?.includes("\"initialize\"")
+      );
+      assert.ok(echoedInitialize);
+      const echoed = JSON.parse(echoedInitialize.payload.text);
+      assert.equal(echoed.initialize.capabilities.supports_question, true);
+      assert.equal(echoed.initialize.external_tools[0].name, "open_in_ide");
     });
 
     it("should throw on double connect", async () => {
@@ -104,6 +160,125 @@ describe("WireClient", () => {
       await client.cancel();
       const result = await p;
       assert.equal(result.status, "cancelled");
+    });
+
+    it("WireClient custom request handler can reject approvals", async () => {
+      const requests = [];
+      const sentMessages = [];
+      const events = [];
+      client = makeClient("approval-required", {
+        delayMs: 5,
+        env: { FAKE_KIMI_ECHO_REQUEST_RESPONSES: "1" },
+        requestHandler: async (envelope) => {
+          requests.push(envelope);
+          if (envelope.type === "ApprovalRequest") {
+            return {
+              request_id: envelope.payload.id,
+              response: "reject",
+              feedback: "Rejected by test handler",
+            };
+          }
+          return undefined;
+        },
+      });
+      client.on("event", (evt) => events.push(evt.detail));
+      const sendRaw = client._sendRaw.bind(client);
+      client._sendRaw = (msg) => {
+        sentMessages.push(msg);
+        sendRaw(msg);
+      };
+
+      await client.connect();
+      const result = await client.prompt("Write a file");
+
+      assert.equal(result.status, "finished");
+      assert.equal(requests.length, 1);
+      assert.equal(requests[0].type, "ApprovalRequest");
+      assert.equal(requests[0].payload.id, "approval-1");
+      assert.ok(
+        sentMessages.some(
+          (msg) => msg.result?.request_id === "approval-1" && msg.result?.response === "reject"
+        )
+      );
+      const echoedResponse = findJsonContent(events, "wire_request_response");
+      assert.equal(echoedResponse.result.request_id, "approval-1");
+      assert.equal(echoedResponse.result.response, "reject");
+    });
+
+    it("WireClient request handler null falls back to auto approval", async () => {
+      const requests = [];
+      const sentMessages = [];
+      const events = [];
+      client = makeClient("approval-required", {
+        delayMs: 5,
+        env: { FAKE_KIMI_ECHO_REQUEST_RESPONSES: "1" },
+        requestHandler: async (envelope) => {
+          requests.push(envelope);
+          return null;
+        },
+      });
+      client.on("event", (evt) => events.push(evt.detail));
+      const sendRaw = client._sendRaw.bind(client);
+      client._sendRaw = (msg) => {
+        sentMessages.push(msg);
+        sendRaw(msg);
+      };
+
+      await client.connect();
+      const result = await client.prompt("Write a file");
+
+      assert.equal(result.status, "finished");
+      assert.equal(requests.length, 1);
+      assert.equal(requests[0].type, "ApprovalRequest");
+      assert.ok(
+        sentMessages.some(
+          (msg) => msg.result?.request_id === "approval-1" && msg.result?.response === "approve"
+        )
+      );
+      const echoedResponse = findJsonContent(events, "wire_request_response");
+      assert.equal(echoedResponse.result.request_id, "approval-1");
+      assert.equal(echoedResponse.result.response, "approve");
+    });
+
+    it("WireClient auto tool fallback returns Kimi tool result shape", async () => {
+      const sentMessages = [];
+      const events = [];
+      client = makeClient("tool-call-required", {
+        delayMs: 5,
+        env: { FAKE_KIMI_ECHO_REQUEST_RESPONSES: "1" },
+      });
+      client.on("event", (evt) => events.push(evt.detail));
+      const sendRaw = client._sendRaw.bind(client);
+      client._sendRaw = (msg) => {
+        sentMessages.push(msg);
+        sendRaw(msg);
+      };
+
+      await client.connect();
+      const result = await client.prompt("Read a file");
+
+      assert.equal(result.status, "finished");
+      assert.ok(
+        sentMessages.some((msg) => {
+          const returnValue = msg.result?.return_value;
+          return (
+            msg.result?.tool_call_id === "tool-call-1" &&
+            returnValue?.is_error === true &&
+            returnValue?.output === "" &&
+            returnValue?.message === "Tool execution not implemented in WireClient auto-responder" &&
+            Array.isArray(returnValue?.display) &&
+            returnValue.display.length === 0
+          );
+        })
+      );
+      const echoedResponse = findJsonContent(events, "wire_request_response");
+      assert.equal(echoedResponse.result.tool_call_id, "tool-call-1");
+      assert.deepEqual(echoedResponse.result.return_value, {
+        is_error: true,
+        output: "",
+        message: "Tool execution not implemented in WireClient auto-responder",
+        display: [],
+      });
     });
 
     it("should reject cancel when not streaming", async () => {

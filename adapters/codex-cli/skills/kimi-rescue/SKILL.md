@@ -14,7 +14,7 @@ Delegate a coding task to Kimi CLI (Moonshot AI).
 When the user asks to delegate a task to Kimi, run:
 
 ```bash
-node path/to/kimi-companion.mjs task "<task description>"
+node "$HOME/.kimi-plugin/kimi-companion.mjs" task "<task description>"
 ```
 
 ## Rules

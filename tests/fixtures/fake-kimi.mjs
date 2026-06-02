@@ -8,7 +8,11 @@
  * Behaviors:
  *   - "review-ok"        : Returns clean review (no findings)
  *   - "review-findings"  : Returns review with structured findings
+ *   - "code-json"        : Returns structured code implementation output
+ *   - "code-text"        : Returns plain text code implementation output
  *   - "task-complete"    : Returns task output
+ *   - "approval-required": Sends an approval request before task output
+ *   - "tool-call-required": Sends a tool call request before task output
  *   - "auth-required"    : Returns AUTH_EXPIRED on prompt
  *   - "network-error"    : Exits immediately
  *   - "slow"             : Emits events slowly
@@ -25,6 +29,7 @@ let streaming = false;
 let cancelResolve = null;
 let cancelledFlag = false;
 let msgIdCounter = 0;
+const pendingRequestResponses = new Map();
 
 function makeId() {
   return `fake-${++msgIdCounter}`;
@@ -44,12 +49,19 @@ function sendEvent(eventType, payload) {
 }
 
 function sendRequest(requestType, payload) {
+  const id = makeId();
+  let resolveResponse;
+  const response = new Promise((resolve) => {
+    resolveResponse = resolve;
+  });
+  pendingRequestResponses.set(id, { response, resolve: resolveResponse });
   send({
     jsonrpc: "2.0",
     method: "request",
-    id: makeId(),
+    id,
     params: { type: requestType, payload },
   });
+  return id;
 }
 
 function sendSuccess(id, result) {
@@ -64,12 +76,36 @@ async function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+async function waitForRequestResponse(id) {
+  const pending = pendingRequestResponses.get(id);
+  if (!pending) return null;
+  const timeoutMs = Math.max(DELAY_MS * 10, 50);
+  return Promise.race([pending.response, delay(timeoutMs).then(() => null)]);
+}
+
+function acceptRequestResponse(msg) {
+  if (msg.method !== undefined || msg.id == null || !pendingRequestResponses.has(msg.id)) {
+    return false;
+  }
+
+  const pending = pendingRequestResponses.get(msg.id);
+  pendingRequestResponses.delete(msg.id);
+  const response = { id: msg.id };
+  if (Object.hasOwn(msg, "result")) response.result = msg.result;
+  if (Object.hasOwn(msg, "error")) response.error = msg.error;
+  pending.resolve(response);
+  return true;
+}
+
 async function handleInitialize(msg) {
   if (initialized) {
     sendError(msg.id, -32000, "Already initialized");
     return;
   }
   initialized = true;
+  if (process.env.FAKE_KIMI_ECHO_INITIALIZE === "1") {
+    sendEvent("ContentPart", { type: "text", text: JSON.stringify({ initialize: msg.params }) });
+  }
   sendSuccess(msg.id, {
     protocol_version: "1.10",
     server: { name: "fake-kimi", version: "0.0.1" },
@@ -101,7 +137,34 @@ async function handlePrompt(msg) {
   sendEvent("TurnBegin", { user_input: userInput });
   await delay(DELAY_MS);
 
-  if (BEHAVIOR === "review-ok") {
+  if (BEHAVIOR === "approval-required") {
+    const requestId = sendRequest("ApprovalRequest", {
+      id: "approval-1",
+      tool_call_id: "tc-1",
+      sender: "Write",
+      action: "write file",
+      description: "Write file README.md",
+      display: [],
+    });
+    const response = await waitForRequestResponse(requestId);
+    if (process.env.FAKE_KIMI_ECHO_REQUEST_RESPONSES === "1") {
+      sendEvent("ContentPart", { type: "text", text: JSON.stringify({ wire_request_response: response }) });
+    }
+    await delay(DELAY_MS);
+    sendEvent("ContentPart", { type: "text", text: "Approval request handled." });
+  } else if (BEHAVIOR === "tool-call-required") {
+    const requestId = sendRequest("ToolCallRequest", {
+      id: "tool-call-1",
+      name: "read_file",
+      input: { path: "README.md" },
+    });
+    const response = await waitForRequestResponse(requestId);
+    if (process.env.FAKE_KIMI_ECHO_REQUEST_RESPONSES === "1") {
+      sendEvent("ContentPart", { type: "text", text: JSON.stringify({ wire_request_response: response }) });
+    }
+    await delay(DELAY_MS);
+    sendEvent("ContentPart", { type: "text", text: "Tool call request handled." });
+  } else if (BEHAVIOR === "review-ok") {
     sendEvent("ContentPart", { type: "text", text: "No issues found. Code looks clean!" });
   } else if (BEHAVIOR === "review-findings") {
     sendEvent("ContentPart", {
@@ -125,6 +188,20 @@ async function handlePrompt(msg) {
         ],
       }),
     });
+  } else if (BEHAVIOR === "code-json") {
+    sendEvent("ContentPart", {
+      type: "text",
+      text: JSON.stringify({
+        summary: "Implemented code command.",
+        changed_files: ["core/src/code-result.mjs"],
+        verification: [
+          { command: "node --test tests/unit/code-result.test.mjs", status: "passed", notes: "passed" },
+        ],
+        follow_up: ["Run npm test"],
+      }),
+    });
+  } else if (BEHAVIOR === "code-text") {
+    sendEvent("ContentPart", { type: "text", text: "Implemented code command in plain text." });
   } else if (BEHAVIOR === "task-complete") {
     sendEvent("ContentPart", { type: "text", text: "Task completed successfully." });
   } else if (BEHAVIOR === "cancel-mid") {
@@ -207,6 +284,10 @@ rl.on("line", (line) => {
     msg = JSON.parse(line);
   } catch {
     sendError(null, -32700, "Invalid JSON format");
+    return;
+  }
+
+  if (acceptRequestResponse(msg)) {
     return;
   }
 

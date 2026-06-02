@@ -15,6 +15,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configurable timeouts per command
 - Status pagination for large job histories
 
+## [0.2.0] - 2026-06-02
+
+### Added
+- Kimi Code executor via `code` and `implement` companion commands.
+- Planner/executor workflow where the host CLI plans and reviews while Kimi
+  performs code implementation.
+- Structured code result contract with summary, changed files, verification,
+  follow-up, raw output, and failed-result rendering.
+- `kimi-code` and `/kimi:implement` support for Claude Code.
+- `kimi-programmer` agent and `kimi-code` skill for Codex CLI.
+- Antigravity `agy` plugin with `plugin.json` and `/kimi-*` commands converted
+  to skills.
+- Shared installed runtime at `~/.kimi-plugin/kimi-companion.mjs` for Codex CLI
+  and Antigravity CLI.
+- Functional adapter tests and installer tests for Kimi Code across Claude Code,
+  Codex CLI, and Antigravity CLI packaging.
+
+### Changed
+- Claude Code installation now targets `~/.claude/skills/kimi`, matching the
+  current Claude Code plugin autoload layout.
+- Claude Code plugin manifest and hooks now use the current plugin schema.
+- Codex and Antigravity adapter docs now reference executable installed runtime
+  paths instead of placeholder `path/to/kimi-companion.mjs` text.
+- Antigravity installation now registers the plugin through `agy plugin install`
+  and retains compatibility copies under `~/.antigravity`.
+- Installer banner, package metadata, plugin manifests, and wire client version
+  are now `0.2.0`.
+
+### Fixed
+- Antigravity CLI detection now recognizes the installed `agy` binary.
+- Claude Code `/kimi:code` command registration with Claude Code 2.1.
+- Host-specific uninstall behavior for newly installed Kimi Code and shared
+  runtime assets.
+- Markdown table escaping for code verification output.
+- Wire client request handling for Kimi tool-call and approval fallbacks.
+
+### Verified
+- `npm test` passes with 76 tests.
+- Real Kimi CLI code execution fixed a temporary fixture and passed `npm test`.
+- Codex CLI `0.136.0` delegated implementation to Kimi through the shared
+  runtime and verified the diff.
+- Claude Code `2.1.160` executed `/kimi:code`, delegated to Kimi, and verified
+  the diff.
+- Antigravity CLI `agy 1.0.0` validates and lists the installed `kimi` plugin;
+  full `/kimi-code` execution requires an active Antigravity OAuth session.
+
 ## [0.1.1] - 2026-06-02
 
 ### Added

@@ -12,7 +12,7 @@ Check the status of Kimi CLI jobs.
 ## Usage
 
 ```bash
-node path/to/kimi-companion.mjs status
+node "$HOME/.kimi-plugin/kimi-companion.mjs" status
 ```
 
 ## Rules

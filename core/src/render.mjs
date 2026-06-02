@@ -54,6 +54,60 @@ export function renderTaskResult({ status, output, error }) {
   return lines.join("\n");
 }
 
+export function renderCodeResult({ status, summary, changedFiles = [], verification = [], followUp = [], raw, error }) {
+  if (error) {
+    return `## Code Result (failed)\n\n\`\`\`\n${error}\n\`\`\``;
+  }
+
+  const lines = [`## Code Result (${status})`, ""];
+  if (summary) {
+    lines.push(summary, "");
+  }
+
+  if (changedFiles.length > 0) {
+    lines.push("### Changed Files");
+    for (const file of changedFiles) {
+      lines.push(`- \`${file}\``);
+    }
+    lines.push("");
+  }
+
+  if (verification.length > 0) {
+    lines.push("### Verification");
+    lines.push("| Command | Status | Notes |");
+    lines.push("|---|---|---|");
+    for (const item of verification) {
+      const command = renderMarkdownTableCell(item?.command);
+      const itemStatus = renderMarkdownTableCell(item?.status || "not_run");
+      const notes = renderMarkdownTableCell(item?.notes);
+      lines.push(`| ${command} | ${itemStatus} | ${notes} |`);
+    }
+    lines.push("");
+  }
+
+  if (followUp.length > 0) {
+    lines.push("### Follow Up");
+    for (const item of followUp) {
+      lines.push(`- ${item}`);
+    }
+    lines.push("");
+  }
+
+  if (raw) {
+    lines.push("### Raw Output", "", "```", raw, "```");
+  }
+
+  return lines.join("\n");
+}
+
+function renderMarkdownTableCell(value) {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\|/g, "\\|")
+    .replace(/`/g, "\\`");
+}
+
 export function renderStatusSnapshot({ running, latestFinished, recent, total }) {
   const lines = ["## Kimi Plugin Status", ""];
   lines.push(`**Total jobs**: ${total}`);
