@@ -7,7 +7,8 @@ Claude Code, Codex CLI, and Antigravity CLI.
 Use it to:
 
 - run Kimi-backed reviews on local git changes;
-- delegate implementation or rescue tasks to Kimi;
+- delegate implementation to Kimi Code while the host CLI plans and reviews;
+- delegate rescue tasks to Kimi;
 - keep background job state across assistant sessions;
 - install the same workflow into supported host CLIs without duplicating core
   logic.
@@ -17,19 +18,25 @@ runtime dependencies, and has no build step.
 
 ## Current Status
 
-- Version: `0.1.0`
+- Version: `0.2.0`
 - Runtime: stable core modules under `core/src`
 - Hosts: Claude Code, Codex CLI, Antigravity CLI
-- Tests: unit, integration, adapter, and fake-Kimi e2e coverage
+- Tests: unit, integration, adapter, fake-Kimi e2e, and real functional smoke
+  coverage across available host CLIs
 - CI: Node 20 and 22 on GitHub Actions for unit, integration, and adapter tests
 
-Recent hardening in the unreleased branch:
+Release highlights:
 
-- Codex skills now include required `SKILL.md` YAML frontmatter.
-- Codex agent role metadata now matches current Codex schema.
-- The custom test runner ignores helper fixtures during directory scans.
-- The e2e script creates an isolated temporary git fixture and checks expected
-  exit codes explicitly.
+- Kimi Code executor: hosts create the implementation plan, Kimi performs the
+  code change, and the host model reviews the diff and verification.
+- Claude Code exposes `/kimi:code` and `/kimi:implement` through the current
+  plugin schema under `~/.claude/skills/kimi`.
+- Codex CLI installs `kimi-code` plus a `kimi-programmer` agent and uses the
+  shared runtime at `~/.kimi-plugin/kimi-companion.mjs`.
+- Antigravity CLI installs and registers a real `agy` plugin with `/kimi-code`
+  and related commands.
+- The installer now detects the `agy` binary, installs shared runtime assets,
+  and has host-specific uninstall coverage.
 
 ## Requirements
 
@@ -71,19 +78,22 @@ Uninstall:
 
 ```bash
 node scripts/install.mjs --uninstall --all
+node scripts/install.mjs --uninstall --claude
 node scripts/install.mjs --uninstall --codex
+node scripts/install.mjs --uninstall --antigravity
 ```
 
 ## What Gets Installed
 
 | Host | Installed assets | Target |
 |---|---|---|
-| Claude Code | Plugin, commands, agent, skills, hooks, companion script, copied core runtime | `~/.claude/plugins/kimi` |
-| Codex CLI | Skills and `kimi-delegate` agent role | `~/.codex/skills`, `~/.codex/agents` |
-| Antigravity CLI | Rules, skills, workflows | `~/.antigravity` |
+| Claude Code | Plugin, commands, agents, skills, hooks, companion script, copied core runtime | `~/.claude/skills/kimi` |
+| Codex CLI | Skills, agent roles, shared companion runtime | `~/.codex/skills`, `~/.codex/agents`, `~/.kimi-plugin` |
+| Antigravity CLI | Registered `agy` plugin, commands, skills, workflows, shared companion runtime | `~/.gemini/config/plugins/kimi`, `~/.antigravity`, `~/.kimi-plugin` |
 
 The Claude Code installer also copies `core/src` into the installed plugin and
 rewrites the companion's core import path so it works outside this repository.
+Codex and Antigravity use the shared runtime at `~/.kimi-plugin/kimi-companion.mjs`.
 
 ## Host Workflows
 
@@ -95,13 +105,15 @@ Installed slash commands:
 - `/kimi:review`
 - `/kimi:adversarial-review`
 - `/kimi:rescue`
+- `/kimi:code`
+- `/kimi:implement`
 - `/kimi:status`
 - `/kimi:result`
 - `/kimi:cancel`
 
 The Claude Code plugin also includes:
 
-- `kimi-rescue` agent for delegated task execution;
+- `kimi-rescue` and `kimi-code` agents for delegated task execution;
 - `kimi-cli-runtime`, `kimi-prompting`, and `kimi-result-handling` skills;
 - a `SessionStart` hook that can run setup checks.
 
@@ -109,10 +121,11 @@ The Claude Code plugin also includes:
 
 Installed Codex assets:
 
-- agent role: `kimi-delegate`
+- agent roles: `kimi-delegate`, `kimi-programmer`
 - skills:
   - `kimi-review`
   - `kimi-rescue`
+  - `kimi-code`
   - `kimi-status`
   - `kimi-prompting`
 
@@ -124,25 +137,48 @@ with YAML frontmatter containing `name` and `description`.
 
 Installed Antigravity assets:
 
-- rule: `kimi-plugin.md`
+- registered plugin: `kimi`
+- commands:
+  - `/kimi-setup`
+  - `/kimi-review`
+  - `/kimi-rescue`
+  - `/kimi-code`
+  - `/kimi-status`
+  - `/kimi-result`
+  - `/kimi-cancel`
+- rule copy: `kimi-plugin.md`
 - skills:
   - `kimi-review`
   - `kimi-rescue`
+  - `kimi-code`
   - `kimi-status`
-- workflows:
+- workflow copies:
   - `kimi-setup`
   - `kimi-review`
   - `kimi-rescue`
+  - `kimi-code`
   - `kimi-status`
   - `kimi-result`
   - `kimi-cancel`
 
 ## Companion Commands
 
-All host adapters ultimately route to:
+All source-tree commands can be exercised directly through:
 
 ```bash
 node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs <command>
+```
+
+Installed Codex and Antigravity adapters route to the shared runtime:
+
+```bash
+node "$HOME/.kimi-plugin/kimi-companion.mjs" <command>
+```
+
+Installed Claude Code routes to its plugin-local runtime:
+
+```bash
+node "$HOME/.claude/skills/kimi/scripts/kimi-companion.mjs" <command>
 ```
 
 Supported commands:
@@ -184,6 +220,24 @@ Delegates a self-contained task prompt to Kimi and stores the result as a job.
 node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs task "Refactor the review parser"
 ```
 
+### `code` / `implement`
+
+Delegates implementation to Kimi Code from a host-authored plan.
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs code "Implement the plan in docs/plan.md and run npm test"
+```
+
+The host CLI should plan first, then call this command with a self-contained implementation plan. Kimi acts as the programmer; the host remains planner and reviewer.
+
+Expected host behavior:
+
+1. Inspect the repository enough to write a concrete implementation plan.
+2. Include files likely to change, constraints, and verification commands.
+3. Invoke `code` or `implement` with that plan.
+4. Inspect Kimi's changed files and verification output before reporting
+   completion.
+
 ### `status`
 
 Shows a Markdown snapshot of recent jobs.
@@ -214,6 +268,10 @@ node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs cancel --id=<j
 |---|---|---|
 | `KIMI_COMMAND` | companion, tests | Binary to spawn. Defaults to `kimi`. |
 | `KIMI_ARGS` | companion, tests | Comma-separated args. Defaults to `--wire`. |
+| `KIMI_MODEL` | companion | Optional model label, recommended `kimi-for-coding` for Kimi Code. |
+| `KIMI_WORK_DIR` | companion | Working directory for the Kimi subprocess. Defaults to current directory. |
+| `KIMI_PERMISSION_MODE` | companion | Permission label for code jobs: `default`, `auto`, or `yolo`. |
+| `KIMI_EXECUTOR` | companion | Human-readable executor label stored in jobs. |
 | `KIMI_STATE_DIR` | `JobControl` | Directory for persisted job JSON files. |
 | `FAKE_KIMI_BEHAVIOR` | tests | Fake Kimi scenario. |
 | `FAKE_KIMI_DELAY_MS` | tests | Fake Kimi response delay. |
@@ -225,6 +283,15 @@ KIMI_COMMAND=node \
 KIMI_ARGS=tests/fixtures/fake-kimi.mjs \
 KIMI_STATE_DIR=/tmp/kimi-state \
 node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs setup
+```
+
+Example using Kimi Code executor settings:
+
+```bash
+KIMI_COMMAND=kimi-agent \
+KIMI_ARGS=--work-dir,/path/to/repo,--model,kimi-for-coding \
+KIMI_EXECUTOR=kimi-agent \
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs code "Implement the approved plan"
 ```
 
 ## Architecture

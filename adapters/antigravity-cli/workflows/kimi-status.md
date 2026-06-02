@@ -9,5 +9,5 @@ Check the status of Kimi plugin jobs.
 
 ## Steps
 
-1. Invoke `kimi-companion.mjs status`.
+1. Invoke `node "$HOME/.kimi-plugin/kimi-companion.mjs" status`.
 2. Present the status snapshot to the user.
