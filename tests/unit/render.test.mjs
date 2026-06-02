@@ -96,6 +96,21 @@ describe("render", () => {
     assert.match(md, /Raw Output/);
   });
 
+  test("renderCodeResult escapes verification table cells", () => {
+    const md = renderCodeResult({
+      status: "finished",
+      verification: [
+        {
+          command: "node -e `console.log('a|b')`",
+          status: "passed|ok",
+          notes: "line one\nline|two\tok",
+        },
+      ],
+    });
+
+    assert.ok(md.includes("| node -e \\`console.log('a\\|b')\\` | passed\\|ok | line one line\\|two ok |"));
+  });
+
   it("renders status snapshot", () => {
     const md = renderStatusSnapshot({
       running: [{ id: "abc-123", kind: "review", phase: "thinking", startedAt: Date.now() - 5000 }],

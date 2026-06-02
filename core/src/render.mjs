@@ -77,7 +77,10 @@ export function renderCodeResult({ status, summary, changedFiles = [], verificat
     lines.push("| Command | Status | Notes |");
     lines.push("|---|---|---|");
     for (const item of verification) {
-      lines.push(`| \`${item.command || ""}\` | ${item.status || "not_run"} | ${item.notes || ""} |`);
+      const command = renderMarkdownTableCell(item?.command);
+      const itemStatus = renderMarkdownTableCell(item?.status || "not_run");
+      const notes = renderMarkdownTableCell(item?.notes);
+      lines.push(`| ${command} | ${itemStatus} | ${notes} |`);
     }
     lines.push("");
   }
@@ -95,6 +98,14 @@ export function renderCodeResult({ status, summary, changedFiles = [], verificat
   }
 
   return lines.join("\n");
+}
+
+function renderMarkdownTableCell(value) {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\|/g, "\\|")
+    .replace(/`/g, "\\`");
 }
 
 export function renderStatusSnapshot({ running, latestFinished, recent, total }) {
