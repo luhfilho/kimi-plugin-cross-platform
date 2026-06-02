@@ -7,9 +7,25 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const EXTENSIONS = new Set([".js", ".mjs", ".cjs"]);
 const TEST_FILE_MARKER = ".test.";
+
+/**
+ * Decide the runner's exit code from a spawnSync result.
+ *
+ * spawnSync returns status=null when the child is killed by a signal
+ * (SIGKILL/OOM, SIGSEGV, SIGTERM in CI) and sets `error` when it cannot be
+ * spawned at all (ENOENT/EAGAIN/ENOMEM). Both must surface as a failure —
+ * otherwise the runner reports a false green and lets the suite "pass"
+ * without actually running. Exported so this is testable without spawning.
+ */
+export function resolveExitCode(result) {
+  if (result.error) return 1;
+  if (result.signal) return 1;
+  return result.status === 0 ? 0 : 1;
+}
 
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {
@@ -67,7 +83,15 @@ function main() {
     shell: false,
   });
 
-  process.exit(result.status ?? 0);
+  if (result.error) {
+    console.error(`Failed to spawn test process: ${result.error.message}`);
+  } else if (result.signal) {
+    console.error(`Test process killed by signal ${result.signal}`);
+  }
+
+  process.exit(resolveExitCode(result));
 }
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}
