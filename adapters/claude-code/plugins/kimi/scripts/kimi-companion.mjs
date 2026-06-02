@@ -320,9 +320,22 @@ async function cmdResult(flags) {
 
   if (job.kind === "review" || job.kind === "adversarial-review") {
     console.log(renderReviewResult(job.output || {}));
-  } else {
-    console.log(renderTaskResult({ status: job.status, output: job.output?.raw }));
+    return;
   }
+
+  if (job.kind === "code") {
+    console.log(renderCodeResult({
+      status: job.status,
+      summary: job.output?.summary,
+      changedFiles: job.output?.changedFiles || [],
+      verification: job.output?.verification || [],
+      followUp: job.output?.followUp || [],
+      raw: job.output?.raw,
+    }));
+    return;
+  }
+
+  console.log(renderTaskResult({ status: job.status, output: job.output?.raw }));
 }
 
 async function cmdCancel(flags) {

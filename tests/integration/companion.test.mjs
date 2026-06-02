@@ -32,9 +32,16 @@ async function makeStateDir() {
 }
 
 async function readJob(stateDir) {
+  return (await readJobFile(stateDir)).job;
+}
+
+async function readJobFile(stateDir) {
   const files = (await readdir(stateDir)).filter((file) => file.endsWith(".json"));
   assert.equal(files.length, 1);
-  return JSON.parse(await readFile(join(stateDir, files[0]), "utf8"));
+  return {
+    id: files[0].replace(/\.json$/, ""),
+    job: JSON.parse(await readFile(join(stateDir, files[0]), "utf8")),
+  };
 }
 
 function fakeKimiEnv(stateDir, behavior) {
@@ -85,6 +92,24 @@ describe("kimi-companion integration", () => {
       assert.equal(job.status, "finished");
       assert.equal(job.output.summary, "Implemented code command.");
       assert.deepEqual(job.output.changedFiles, ["core/src/code-result.mjs"]);
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+
+  it("result renders code job output with code renderer", async () => {
+    const stateDir = await makeStateDir();
+    try {
+      const codeResult = await runCompanion(["code", "Implement result renderer"], fakeKimiEnv(stateDir, "code-json"));
+
+      assert.equal(codeResult.code, 0);
+
+      const { id } = await readJobFile(stateDir);
+      const result = await runCompanion(["result", `--id=${id}`], fakeKimiEnv(stateDir, "code-json"));
+
+      assert.equal(result.code, 0);
+      assert.match(result.stdout, /Code Result \(finished\)/);
+      assert.match(result.stdout, /Implemented code command/);
     } finally {
       await rm(stateDir, { recursive: true, force: true });
     }
