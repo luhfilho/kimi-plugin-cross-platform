@@ -1,3 +1,8 @@
+---
+name: kimi-review
+description: Run Kimi CLI code reviews from Codex and handle structured review output.
+---
+
 # Kimi Review
 
 ## Description

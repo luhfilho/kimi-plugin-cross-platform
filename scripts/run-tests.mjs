@@ -9,6 +9,7 @@ import { join, extname } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const EXTENSIONS = new Set([".js", ".mjs", ".cjs"]);
+const TEST_FILE_MARKER = ".test.";
 
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {
@@ -16,7 +17,11 @@ function walk(dir, files = []) {
     const st = statSync(path);
     if (st.isDirectory()) {
       walk(path, files);
-    } else if (st.isFile() && EXTENSIONS.has(extname(path))) {
+    } else if (
+      st.isFile() &&
+      EXTENSIONS.has(extname(path)) &&
+      path.includes(TEST_FILE_MARKER)
+    ) {
       files.push(path);
     }
   }
@@ -34,8 +39,7 @@ function main() {
       const baseDir = pattern.split("*/")[0];
       try {
         const all = walk(baseDir);
-        const suffix = pattern.includes(".test.") ? ".test." : "";
-        files.push(...all.filter(f => !suffix || f.includes(suffix)));
+        files.push(...all);
       } catch {
         // ignore missing dirs
       }

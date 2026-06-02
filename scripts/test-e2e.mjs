@@ -7,8 +7,8 @@
 
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { execSync, spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { execSync, spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,7 +16,7 @@ const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, "..");
 const COMPANION = join(REPO_ROOT, "adapters", "claude-code", "plugins", "kimi", "scripts", "kimi-companion.mjs");
 const FAKE_KIMI = join(REPO_ROOT, "tests", "fixtures", "fake-kimi.mjs");
-const TEST_PROJECT = "/tmp/boletim-escolar";
+const TEST_PROJECT = mkdtempSync(join(tmpdir(), "boletim-escolar-"));
 
 // Cria diretório de estado temporário
 const stateDir = mkdtempSync(join(tmpdir(), "kimi-test-state-"));
@@ -35,58 +35,83 @@ function runCommand(subcommand, args = [], cwd = TEST_PROJECT) {
   const cmd = [COMPANION, subcommand, ...args];
   console.log(`\n▶️  ${subcommand} ${args.join(" ")}`);
   console.log(`   cwd: ${cwd}`);
-  try {
-    const output = execSync(`${process.execPath} ${cmd.join(" ")}`, {
-      cwd,
-      env,
-      encoding: "utf8",
-      timeout: 30000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+  const result = spawnSync(process.execPath, cmd, {
+    cwd,
+    env,
+    encoding: "utf8",
+    timeout: 30000,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  if (result.status === 0) {
+    const output = result.stdout || "";
     console.log(`   ✅ EXIT 0`);
     console.log(`   Output:\n${output.split("\n").map(l => "   " + l).join("\n")}`);
     passed++;
     return { success: true, output };
-  } catch (e) {
-    console.log(`   ⚠️  EXIT ${e.status}`);
-    console.log(`   Output:\n${(e.stdout || e.message).split("\n").map(l => "   " + l).join("\n")}`);
-    if (e.status === 0 || e.status === 1) {
-      // 1 é esperado para setup sem auth
-      passed++;
-      return { success: true, output: e.stdout || "" };
-    }
-    failed++;
-    return { success: false, output: e.stdout || e.message };
   }
+
+  const output = result.stdout || result.stderr || result.error?.message || "";
+  console.log(`   ⚠️  EXIT ${result.status}`);
+  console.log(`   Output:\n${output.split("\n").map(l => "   " + l).join("\n")}`);
+  if (result.status === 1) {
+    // 1 é esperado para alguns comandos sem resultado acionável.
+    passed++;
+    return { success: true, output };
+  }
+  failed++;
+  return { success: false, output };
 }
 
 function runCommandWithInput(subcommand, args = [], cwd = TEST_PROJECT, input = "") {
   const cmd = [COMPANION, subcommand, ...args];
   console.log(`\n▶️  ${subcommand} ${args.join(" ")}`);
   console.log(`   cwd: ${cwd}`);
-  try {
-    const result = execSync(`${process.execPath} ${cmd.join(" ")}`, {
-      cwd,
-      env,
-      encoding: "utf8",
-      timeout: 30000,
-      input,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+  const result = spawnSync(process.execPath, cmd, {
+    cwd,
+    env,
+    encoding: "utf8",
+    timeout: 30000,
+    input,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  if (result.status === 0) {
+    const output = result.stdout || "";
     console.log(`   ✅ EXIT 0`);
-    console.log(`   Output:\n${result.split("\n").map(l => "   " + l).join("\n")}`);
+    console.log(`   Output:\n${output.split("\n").map(l => "   " + l).join("\n")}`);
     passed++;
-    return { success: true, output: result };
-  } catch (e) {
-    console.log(`   ⚠️  EXIT ${e.status}`);
-    console.log(`   Output:\n${(e.stdout || e.message).split("\n").map(l => "   " + l).join("\n")}`);
-    if (e.status === 0 || e.status === 1) {
-      passed++;
-      return { success: true, output: e.stdout || "" };
-    }
-    failed++;
-    return { success: false, output: e.stdout || e.message };
+    return { success: true, output };
   }
+
+  const output = result.stdout || result.stderr || result.error?.message || "";
+  console.log(`   ⚠️  EXIT ${result.status}`);
+  console.log(`   Output:\n${output.split("\n").map(l => "   " + l).join("\n")}`);
+  if (result.status === 1) {
+    passed++;
+    return { success: true, output };
+  }
+  failed++;
+  return { success: false, output };
+}
+
+function setupTestProject() {
+  writeFileSync(join(TEST_PROJECT, "package.json"), `{
+  "name": "boletim-escolar-e2e",
+  "version": "0.0.0",
+  "type": "module"
+}
+`);
+  writeFileSync(join(TEST_PROJECT, "server.js"), `
+export function calcularMedia(notas) {
+  return notas.reduce((total, nota) => total + nota, 0) / notas.length;
+}
+`);
+  execSync("git init -q", { cwd: TEST_PROJECT });
+  execSync("git config user.email kimi-e2e@example.test", { cwd: TEST_PROJECT });
+  execSync("git config user.name 'Kimi E2E'", { cwd: TEST_PROJECT });
+  execSync("git add -A", { cwd: TEST_PROJECT });
+  execSync("git commit -qm 'initial fixture'", { cwd: TEST_PROJECT });
 }
 
 async function main() {
@@ -96,6 +121,7 @@ async function main() {
   console.log(`\nTest project: ${TEST_PROJECT}`);
   console.log(`State dir: ${stateDir}`);
   console.log(`Fake kimi: ${FAKE_KIMI}`);
+  setupTestProject();
 
   // 1. SETUP
   console.log("\n" + "═".repeat(66));
@@ -188,6 +214,7 @@ module.exports = { calcularMedia };
 
   // Limpa estado
   rmSync(stateDir, { recursive: true, force: true });
+  rmSync(TEST_PROJECT, { recursive: true, force: true });
 
   // Resultados
   console.log("\n" + "═".repeat(66));

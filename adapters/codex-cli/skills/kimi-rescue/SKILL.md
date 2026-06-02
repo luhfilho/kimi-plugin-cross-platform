@@ -1,3 +1,8 @@
+---
+name: kimi-rescue
+description: Delegate coding tasks to Kimi CLI from Codex when an independent implementation or rescue pass is useful.
+---
+
 # Kimi Rescue
 
 ## Description

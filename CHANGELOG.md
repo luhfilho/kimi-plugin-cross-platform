@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Codex CLI adapter startup warnings by adding required skill frontmatter and valid agent role metadata
+- Test runner directory scans now ignore helper fixtures instead of executing non-test modules
+- End-to-end test script now creates an isolated temporary git fixture
+
 ### Planned
 - Broker lifecycle for warm-start shared `kimi --wire` process via Unix socket
 - Review gate hook (Stop) for blocking commits with findings in Claude Code

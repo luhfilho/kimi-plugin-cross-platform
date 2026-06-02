@@ -1,3 +1,8 @@
+---
+name: kimi-prompting
+description: Guidelines for composing self-contained prompts for Kimi CLI from Codex.
+---
+
 # Kimi Prompting
 
 ## Description
