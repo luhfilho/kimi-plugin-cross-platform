@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "kimi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Delegate work to Kimi CLI (Moonshot AI) for code review, rescue tasks, and Kimi Code implementation."
 }

@@ -130,7 +130,7 @@ export class WireClient extends EventTarget {
     const initId = this._makeId();
     this._initializeParams = {
       protocol_version: "1.10",
-      client: { name: "kimi-plugin-cross-platform", version: "0.1.0" },
+      client: { name: "kimi-plugin-cross-platform", version: "0.2.0" },
       capabilities: this._capabilities,
     };
     if (this._externalTools.length > 0) {

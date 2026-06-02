@@ -7,7 +7,8 @@ Claude Code, Codex CLI, and Antigravity CLI.
 Use it to:
 
 - run Kimi-backed reviews on local git changes;
-- delegate implementation or rescue tasks to Kimi;
+- delegate implementation to Kimi Code while the host CLI plans and reviews;
+- delegate rescue tasks to Kimi;
 - keep background job state across assistant sessions;
 - install the same workflow into supported host CLIs without duplicating core
   logic.
@@ -17,19 +18,25 @@ runtime dependencies, and has no build step.
 
 ## Current Status
 
-- Version: `0.1.0`
+- Version: `0.2.0`
 - Runtime: stable core modules under `core/src`
 - Hosts: Claude Code, Codex CLI, Antigravity CLI
-- Tests: unit, integration, adapter, and fake-Kimi e2e coverage
+- Tests: unit, integration, adapter, fake-Kimi e2e, and real functional smoke
+  coverage across available host CLIs
 - CI: Node 20 and 22 on GitHub Actions for unit, integration, and adapter tests
 
-Recent hardening in the unreleased branch:
+Release highlights:
 
-- Codex skills now include required `SKILL.md` YAML frontmatter.
-- Codex agent role metadata now matches current Codex schema.
-- The custom test runner ignores helper fixtures during directory scans.
-- The e2e script creates an isolated temporary git fixture and checks expected
-  exit codes explicitly.
+- Kimi Code executor: hosts create the implementation plan, Kimi performs the
+  code change, and the host model reviews the diff and verification.
+- Claude Code exposes `/kimi:code` and `/kimi:implement` through the current
+  plugin schema under `~/.claude/skills/kimi`.
+- Codex CLI installs `kimi-code` plus a `kimi-programmer` agent and uses the
+  shared runtime at `~/.kimi-plugin/kimi-companion.mjs`.
+- Antigravity CLI installs and registers a real `agy` plugin with `/kimi-code`
+  and related commands.
+- The installer now detects the `agy` binary, installs shared runtime assets,
+  and has host-specific uninstall coverage.
 
 ## Requirements
 
@@ -156,10 +163,22 @@ Installed Antigravity assets:
 
 ## Companion Commands
 
-All host adapters ultimately route to:
+All source-tree commands can be exercised directly through:
 
 ```bash
 node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs <command>
+```
+
+Installed Codex and Antigravity adapters route to the shared runtime:
+
+```bash
+node "$HOME/.kimi-plugin/kimi-companion.mjs" <command>
+```
+
+Installed Claude Code routes to its plugin-local runtime:
+
+```bash
+node "$HOME/.claude/skills/kimi/scripts/kimi-companion.mjs" <command>
 ```
 
 Supported commands:
@@ -210,6 +229,14 @@ node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs code "Implemen
 ```
 
 The host CLI should plan first, then call this command with a self-contained implementation plan. Kimi acts as the programmer; the host remains planner and reviewer.
+
+Expected host behavior:
+
+1. Inspect the repository enough to write a concrete implementation plan.
+2. Include files likely to change, constraints, and verification commands.
+3. Invoke `code` or `implement` with that plan.
+4. Inspect Kimi's changed files and verification output before reporting
+   completion.
 
 ### `status`
 

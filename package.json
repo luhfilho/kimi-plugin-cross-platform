@@ -1,6 +1,6 @@
 {
   "name": "kimi-plugin-cross-platform",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Cross-platform kit for integrating Kimi CLI into Claude Code, Codex CLI, and Antigravity CLI",
   "type": "module",
   "workspaces": [

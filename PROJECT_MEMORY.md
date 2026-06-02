@@ -1,8 +1,8 @@
 # Kimi Plugin Cross-Platform Kit — Neural Memory Consolidation
 
 **Project**: `kimi-plugin-cross-platform`
-**Date**: 2026-05-28
-**Status**: v0.1.0 Released
+**Date**: 2026-06-02
+**Status**: v0.2.0 Released
 **Repo**: https://github.com/luhfilho/kimi-plugin-cross-platform
 
 ---
@@ -20,6 +20,9 @@
 - [x] Set up GitHub Actions CI
 - [x] Create GitHub repo, push, tag v0.1.0, release
 - [x] Fix CI glob expansion issue with custom test runner
+- [x] Add Kimi Code planner/executor flow for Claude Code, Codex CLI, and Antigravity CLI
+- [x] Validate real Kimi execution through direct companion, Codex CLI, and Claude Code
+- [x] Register Antigravity adapter as a real `agy` plugin
 
 ## 2. Pending Tasks
 
@@ -184,9 +187,9 @@ Auto-approval policy:
 - **Accuracy**: 100% match with intentionally planted vulnerabilities
 
 ### Evidence 5: Install Script
-- **Detects**: Claude Code ✅, Codex CLI ✅, Antigravity CLI ❌
-- **Installs**: ~/.claude/plugins/kimi, ~/.codex/, ~/.antigravity/
-- **Features**: --dry-run, --uninstall, --claude, --codex, --antigravity
+- **Detects**: Claude Code ✅, Codex CLI ✅, Antigravity CLI (`agy`) ✅
+- **Installs**: `~/.claude/skills/kimi`, `~/.codex/`, `~/.antigravity/`, `~/.kimi-plugin/`
+- **Features**: `--dry-run`, `--uninstall`, `--claude`, `--codex`, `--antigravity`, `agy plugin install`
 
 ---
 

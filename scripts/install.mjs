@@ -437,7 +437,7 @@ async function main() {
   const flags = parseArgs();
 
   console.log("╔══════════════════════════════════════════════════════════════════╗");
-  console.log("║   Kimi Plugin Cross-Platform Kit — Installer v0.1.0              ║");
+  console.log("║   Kimi Plugin Cross-Platform Kit — Installer v0.2.0              ║");
   console.log("╚══════════════════════════════════════════════════════════════════╝");
 
   if (flags.uninstall) {
