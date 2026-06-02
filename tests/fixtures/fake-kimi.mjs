@@ -10,6 +10,7 @@
  *   - "review-findings"  : Returns review with structured findings
  *   - "task-complete"    : Returns task output
  *   - "approval-required": Sends an approval request before task output
+ *   - "tool-call-required": Sends a tool call request before task output
  *   - "auth-required"    : Returns AUTH_EXPIRED on prompt
  *   - "network-error"    : Exits immediately
  *   - "slow"             : Emits events slowly
@@ -149,6 +150,18 @@ async function handlePrompt(msg) {
     }
     await delay(DELAY_MS);
     sendEvent("ContentPart", { type: "text", text: "Approval request handled." });
+  } else if (BEHAVIOR === "tool-call-required") {
+    const requestId = sendRequest("ToolCallRequest", {
+      id: "tool-call-1",
+      name: "read_file",
+      input: { path: "README.md" },
+    });
+    const response = await waitForRequestResponse(requestId);
+    if (process.env.FAKE_KIMI_ECHO_REQUEST_RESPONSES === "1") {
+      sendEvent("ContentPart", { type: "text", text: JSON.stringify({ wire_request_response: response }) });
+    }
+    await delay(DELAY_MS);
+    sendEvent("ContentPart", { type: "text", text: "Tool call request handled." });
   } else if (BEHAVIOR === "review-ok") {
     sendEvent("ContentPart", { type: "text", text: "No issues found. Code looks clean!" });
   } else if (BEHAVIOR === "review-findings") {

@@ -449,7 +449,10 @@ export class WireClient extends EventTarget {
         result: {
           tool_call_id: envelope.payload.id,
           return_value: {
-            error: "Tool execution not implemented in WireClient auto-responder",
+            is_error: true,
+            output: "",
+            message: "Tool execution not implemented in WireClient auto-responder",
+            display: [],
           },
         },
       });

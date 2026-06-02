@@ -240,6 +240,47 @@ describe("WireClient", () => {
       assert.equal(echoedResponse.result.response, "approve");
     });
 
+    it("WireClient auto tool fallback returns Kimi tool result shape", async () => {
+      const sentMessages = [];
+      const events = [];
+      client = makeClient("tool-call-required", {
+        delayMs: 5,
+        env: { FAKE_KIMI_ECHO_REQUEST_RESPONSES: "1" },
+      });
+      client.on("event", (evt) => events.push(evt.detail));
+      const sendRaw = client._sendRaw.bind(client);
+      client._sendRaw = (msg) => {
+        sentMessages.push(msg);
+        sendRaw(msg);
+      };
+
+      await client.connect();
+      const result = await client.prompt("Read a file");
+
+      assert.equal(result.status, "finished");
+      assert.ok(
+        sentMessages.some((msg) => {
+          const returnValue = msg.result?.return_value;
+          return (
+            msg.result?.tool_call_id === "tool-call-1" &&
+            returnValue?.is_error === true &&
+            returnValue?.output === "" &&
+            returnValue?.message === "Tool execution not implemented in WireClient auto-responder" &&
+            Array.isArray(returnValue?.display) &&
+            returnValue.display.length === 0
+          );
+        })
+      );
+      const echoedResponse = findJsonContent(events, "wire_request_response");
+      assert.equal(echoedResponse.result.tool_call_id, "tool-call-1");
+      assert.deepEqual(echoedResponse.result.return_value, {
+        is_error: true,
+        output: "",
+        message: "Tool execution not implemented in WireClient auto-responder",
+        display: [],
+      });
+    });
+
     it("should reject cancel when not streaming", async () => {
       client = makeClient();
       await client.connect();
