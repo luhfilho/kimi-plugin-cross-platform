@@ -15,6 +15,7 @@ test("buildCodePrompt wraps a host-authored plan with implementation constraints
   assert.match(prompt, /Return your final answer as JSON/);
   assert.match(prompt, /changed_files/);
   assert.match(prompt, /verification/);
+  assert.match(prompt, /Report blockers instead of guessing/);
 });
 
 test("parseCodeResult accepts structured JSON output", () => {

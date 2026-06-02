@@ -30,6 +30,7 @@ export function buildCodePrompt({ plan, worktreeRoot }) {
     "- Keep changes scoped to the requested files and behavior.",
     "- Run the requested verification commands when possible.",
     "- Report any skipped verification with status not_run.",
+    "- Report blockers instead of guessing.",
     "",
     "Return your final answer as JSON matching this contract:",
     JSON.stringify(outputContract, null, 2),
