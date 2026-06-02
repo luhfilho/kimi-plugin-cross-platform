@@ -8,6 +8,8 @@
  * Behaviors:
  *   - "review-ok"        : Returns clean review (no findings)
  *   - "review-findings"  : Returns review with structured findings
+ *   - "code-json"        : Returns structured code implementation output
+ *   - "code-text"        : Returns plain text code implementation output
  *   - "task-complete"    : Returns task output
  *   - "approval-required": Sends an approval request before task output
  *   - "tool-call-required": Sends a tool call request before task output
@@ -186,6 +188,20 @@ async function handlePrompt(msg) {
         ],
       }),
     });
+  } else if (BEHAVIOR === "code-json") {
+    sendEvent("ContentPart", {
+      type: "text",
+      text: JSON.stringify({
+        summary: "Implemented code command.",
+        changed_files: ["core/src/code-result.mjs"],
+        verification: [
+          { command: "node --test tests/unit/code-result.test.mjs", status: "passed", notes: "passed" },
+        ],
+        follow_up: ["Run npm test"],
+      }),
+    });
+  } else if (BEHAVIOR === "code-text") {
+    sendEvent("ContentPart", { type: "text", text: "Implemented code command in plain text." });
   } else if (BEHAVIOR === "task-complete") {
     sendEvent("ContentPart", { type: "text", text: "Task completed successfully." });
   } else if (BEHAVIOR === "cancel-mid") {

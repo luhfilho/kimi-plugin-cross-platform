@@ -11,10 +11,11 @@ const CORE_SRC = join(__dirname, "../../../../../core/src");
 const { WireClient } = await import(join(CORE_SRC, "wire-client.mjs"));
 const { JobControl } = await import(join(CORE_SRC, "job-control.mjs"));
 const { GitContext } = await import(join(CORE_SRC, "git-context.mjs"));
-const { renderSetupReport, renderReviewResult, renderTaskResult, renderStatusSnapshot } =
+const { renderSetupReport, renderReviewResult, renderTaskResult, renderStatusSnapshot, renderCodeResult } =
   await import(join(CORE_SRC, "render.mjs"));
+const { buildCodePrompt, parseCodeResult } = await import(join(CORE_SRC, "code-result.mjs"));
 
-const SUBCOMMANDS = ["setup", "review", "adversarial-review", "task", "status", "result", "cancel"];
+const SUBCOMMANDS = ["setup", "review", "adversarial-review", "task", "code", "implement", "status", "result", "cancel"];
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -44,11 +45,25 @@ function parseArgs(argv) {
 
 function makeKimiClient() {
   const command = process.env.KIMI_COMMAND || "kimi";
-  const args = process.env.KIMI_ARGS ? process.env.KIMI_ARGS.split(",") : ["--wire"];
+  const args = process.env.KIMI_ARGS ? process.env.KIMI_ARGS.split(",").filter(Boolean) : ["--wire"];
+  const cwd = process.env.KIMI_WORK_DIR || process.cwd();
   return new WireClient({
     command,
     args,
+    cwd,
+    capabilities: { supports_question: false, supports_plan_mode: false },
   });
+}
+
+function getExecutorInfo() {
+  return {
+    command: process.env.KIMI_COMMAND || "kimi",
+    args: process.env.KIMI_ARGS ? process.env.KIMI_ARGS.split(",").filter(Boolean) : ["--wire"],
+    model: process.env.KIMI_MODEL || "",
+    worktreeRoot: process.env.KIMI_WORK_DIR || process.cwd(),
+    permissionMode: process.env.KIMI_PERMISSION_MODE || "default",
+    executor: process.env.KIMI_EXECUTOR || "kimi-wire",
+  };
 }
 
 async function cmdSetup() {
@@ -171,6 +186,72 @@ function buildReviewPrompt(ctx, adversarial) {
   return prompt;
 }
 
+async function cmdCode(positional) {
+  const plan = positional.join(" ");
+  if (!plan) {
+    console.error("Error: No implementation plan provided.");
+    process.exit(1);
+  }
+
+  const executorInfo = getExecutorInfo();
+  const prompt = buildCodePrompt({ plan, worktreeRoot: executorInfo.worktreeRoot });
+  const jc = new JobControl({ stateDir: process.env.KIMI_STATE_DIR });
+  const jobId = await jc.create({
+    kind: "code",
+    status: "running",
+    startedAt: Date.now(),
+    prompt: plan,
+    worktreeRoot: executorInfo.worktreeRoot,
+    executor: executorInfo.executor,
+    model: executorInfo.model,
+    permissionMode: executorInfo.permissionMode,
+  });
+
+  let raw = "";
+  let failed = false;
+  const client = makeKimiClient();
+
+  try {
+    await client.connect();
+    client.on("event", (evt) => {
+      const e = evt.detail;
+      if (e.type === "ContentPart" && e.payload?.type === "text") {
+        raw += e.payload.text;
+      }
+    });
+    await client.prompt(prompt);
+  } catch (e) {
+    failed = true;
+    raw = e.message || String(e);
+  } finally {
+    try {
+      await client.dispose();
+    } catch {
+      // ignore cleanup failures
+    }
+  }
+
+  const parsed = failed
+    ? { summary: raw, changedFiles: [], verification: [], followUp: [] }
+    : parseCodeResult(raw);
+  const output = {
+    raw,
+    summary: parsed.summary,
+    changedFiles: parsed.changedFiles,
+    verification: parsed.verification,
+    followUp: parsed.followUp,
+  };
+
+  await jc.update(jobId, {
+    status: failed ? "failed" : "finished",
+    finishedAt: Date.now(),
+    output,
+  });
+
+  console.log(renderCodeResult({ status: failed ? "failed" : "finished", ...output }));
+  process.exit(failed ? 1 : 0);
+}
+
 async function cmdTask(positional) {
   const prompt = positional.join(" ");
   if (!prompt) {
@@ -283,6 +364,10 @@ async function main() {
       break;
     case "task":
       await cmdTask(positional);
+      break;
+    case "code":
+    case "implement":
+      await cmdCode(positional);
       break;
     case "status":
       await cmdStatus();
