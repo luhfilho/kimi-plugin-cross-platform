@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Planned
+- Broker lifecycle for warm-start shared `kimi --wire` process via Unix socket
+- Review gate hook (Stop) for blocking commits with findings in Claude Code
+- Real `kimi --wire` end-to-end integration tests
+- Support for partial job IDs in `cancel` and `result` commands
+- Configurable timeouts per command
+- Status pagination for large job histories
+
+## [0.1.1] - 2026-06-02
+
+### Added
+- Codex adapter regression tests for skill frontmatter and agent role metadata
+- E2E helper classification tests for expected non-zero exits
+- Project guidance and session-consolidation documentation
+
+### Changed
+- Test runner now scans only `.test.` files in directories, avoiding helper fixture execution
+- E2E script now creates an isolated temporary git fixture and validates expected exit statuses
+- CI now includes adapter tests on Node 20 and 22
+- README and testing report were refreshed for the current adapter and test workflow
+
+### Fixed
+- Codex CLI adapter startup warnings by adding required skill frontmatter and valid agent role metadata
+- Full test suite hangs caused by executing `tests/fixtures/fake-kimi.mjs` as a test file
+- False-green E2E results for commands that exited with unexpected status
+
 ## [0.1.0] - 2026-05-28
 
 ### Added
@@ -29,18 +57,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cancel race condition in fake-kimi fixture
 - EventTarget missing `.on()` method: added convenience wrapper
 - Install script core module path resolution for out-of-repo execution
-
-## [Unreleased]
-
-### Fixed
-- Codex CLI adapter startup warnings by adding required skill frontmatter and valid agent role metadata
-- Test runner directory scans now ignore helper fixtures instead of executing non-test modules
-- End-to-end test script now creates an isolated temporary git fixture
-
-### Planned
-- Broker lifecycle for warm-start shared `kimi --wire` process via Unix socket
-- Review gate hook (Stop) for blocking commits with findings in Claude Code
-- Real `kimi --wire` end-to-end integration tests
-- Support for partial job IDs in `cancel` and `result` commands
-- Configurable timeouts per command
-- Status pagination for large job histories
