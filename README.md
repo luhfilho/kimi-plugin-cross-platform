@@ -78,8 +78,8 @@ node scripts/install.mjs --uninstall --codex
 
 | Host | Installed assets | Target |
 |---|---|---|
-| Claude Code | Plugin, commands, agent, skills, hooks, companion script, copied core runtime | `~/.claude/plugins/kimi` |
-| Codex CLI | Skills and `kimi-delegate` agent role | `~/.codex/skills`, `~/.codex/agents` |
+| Claude Code | Plugin, commands, agents, skills, hooks, companion script, copied core runtime | `~/.claude/plugins/kimi` |
+| Codex CLI | Skills and agent roles | `~/.codex/skills`, `~/.codex/agents` |
 | Antigravity CLI | Rules, skills, workflows | `~/.antigravity` |
 
 The Claude Code installer also copies `core/src` into the installed plugin and
@@ -103,7 +103,7 @@ Installed slash commands:
 
 The Claude Code plugin also includes:
 
-- `kimi-rescue` agent for delegated task execution;
+- `kimi-rescue` and `kimi-code` agents for delegated task execution;
 - `kimi-cli-runtime`, `kimi-prompting`, and `kimi-result-handling` skills;
 - a `SessionStart` hook that can run setup checks.
 
@@ -111,7 +111,7 @@ The Claude Code plugin also includes:
 
 Installed Codex assets:
 
-- agent role: `kimi-delegate`
+- agent roles: `kimi-delegate`, `kimi-programmer`
 - skills:
   - `kimi-review`
   - `kimi-rescue`

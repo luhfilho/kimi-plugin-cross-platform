@@ -217,7 +217,7 @@ function installAntigravityCLI(dryRun) {
   );
 
   console.log("   ✅ Antigravity CLI adapter installed.");
-  console.log(`   Workflows available: kimi-review, kimi-rescue, kimi-code, kimi-status`);
+  console.log(`   Workflows available: kimi-setup, kimi-review, kimi-rescue, kimi-code, kimi-status, kimi-result, kimi-cancel`);
   return true;
 }
 
