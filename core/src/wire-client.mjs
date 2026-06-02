@@ -404,7 +404,7 @@ export class WireClient extends EventTarget {
     if (this._requestHandler) {
       try {
         const result = await this._requestHandler(envelope, requestId, this);
-        if (result !== undefined) {
+        if (result !== undefined && result !== null) {
           this._sendRaw({
             jsonrpc: "2.0",
             id: requestId,
