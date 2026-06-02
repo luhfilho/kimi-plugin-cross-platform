@@ -31,3 +31,8 @@ test("Claude Code exposes Kimi code commands and agent", () => {
   assert.match(agent, /plan first/i);
   assert.match(agent, /Kimi/i);
 });
+
+test("Codex CLI exposes Kimi code skill and agent", () => {
+  assert.equal(existsSync(join(ROOT, "adapters/codex-cli/skills/kimi-code/SKILL.md")), true);
+  assert.equal(existsSync(join(ROOT, "adapters/codex-cli/agents/kimi-programmer.toml")), true);
+});

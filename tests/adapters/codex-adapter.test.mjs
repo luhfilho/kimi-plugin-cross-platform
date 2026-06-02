@@ -56,3 +56,14 @@ test("Codex agent role uses TOML assignments for behavior", () => {
   assert.match(toml, /^developer_instructions\s*=\s*"""/m);
   assert.doesNotMatch(toml, /^\[(agent|capabilities|behavior)\]/m);
 });
+
+test("Codex Kimi code skill and programmer agent are installed artifacts", () => {
+  const skill = readFileSync(join(codexAdapterRoot, "skills/kimi-code/SKILL.md"), "utf8");
+  assert.match(skill, /^---\nname: kimi-code\n/m);
+  assert.match(skill, /plan first/i);
+  assert.match(skill, /kimi-companion\.mjs code/);
+
+  const agent = readFileSync(join(codexAdapterRoot, "agents/kimi-programmer.toml"), "utf8");
+  assert.match(agent, /name = "kimi-programmer"/);
+  assert.match(agent, /Kimi Code/);
+});
