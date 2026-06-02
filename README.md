@@ -38,6 +38,28 @@ Release highlights:
 - The installer now detects the `agy` binary, installs shared runtime assets,
   and has host-specific uninstall coverage.
 
+## Showcase: end-to-end proof of concept
+
+A complete, working app built entirely through this plugin's workflow on
+**v0.2.0**, as live evidence that the cross-platform pipeline works end to end:
+
+**[jogo-da-velha-kimi-demo](https://github.com/luhfilho/jogo-da-velha-kimi-demo)**
+— a retro/neon Tic-Tac-Toe in pure vanilla JavaScript (no frameworks, no build).
+
+- ▶️ **Live demo (GitHub Pages):** https://luhfilho.github.io/jogo-da-velha-kimi-demo/
+- 📋 **Full write-up & evidence:** [`docs/showcase-jogo-da-velha.md`](docs/showcase-jogo-da-velha.md)
+
+How it was produced — the host plans, Kimi implements, an independent model
+reviews, and the host runs functional tests:
+
+| Step | Tool | Role |
+|------|------|------|
+| 1. Plan | Claude Code (host) | Requirements, architecture, implementation plan |
+| 2. Implement | Kimi via `/kimi:code` | Wrote `index.html`, `styles.css`, `script.js` |
+| 3. Review | Codex (adversarial) | Found 5 issues, incl. a critical AI race condition |
+| 4. Fix | Kimi | Applied the fixes (generation token + `clearTimeout`) |
+| 5. Test | Chrome DevTools | 7 functional scenarios passed, console clean |
+
 ## Requirements
 
 - Node.js `>=20.0.0`
