@@ -95,6 +95,8 @@ Installed slash commands:
 - `/kimi:review`
 - `/kimi:adversarial-review`
 - `/kimi:rescue`
+- `/kimi:code`
+- `/kimi:implement`
 - `/kimi:status`
 - `/kimi:result`
 - `/kimi:cancel`
@@ -113,6 +115,7 @@ Installed Codex assets:
 - skills:
   - `kimi-review`
   - `kimi-rescue`
+  - `kimi-code`
   - `kimi-status`
   - `kimi-prompting`
 
@@ -128,11 +131,13 @@ Installed Antigravity assets:
 - skills:
   - `kimi-review`
   - `kimi-rescue`
+  - `kimi-code`
   - `kimi-status`
 - workflows:
   - `kimi-setup`
   - `kimi-review`
   - `kimi-rescue`
+  - `kimi-code`
   - `kimi-status`
   - `kimi-result`
   - `kimi-cancel`
@@ -184,6 +189,16 @@ Delegates a self-contained task prompt to Kimi and stores the result as a job.
 node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs task "Refactor the review parser"
 ```
 
+### `code` / `implement`
+
+Delegates implementation to Kimi Code from a host-authored plan.
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs code "Implement the plan in docs/plan.md and run npm test"
+```
+
+The host CLI should plan first, then call this command with a self-contained implementation plan. Kimi acts as the programmer; the host remains planner and reviewer.
+
 ### `status`
 
 Shows a Markdown snapshot of recent jobs.
@@ -214,6 +229,10 @@ node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs cancel --id=<j
 |---|---|---|
 | `KIMI_COMMAND` | companion, tests | Binary to spawn. Defaults to `kimi`. |
 | `KIMI_ARGS` | companion, tests | Comma-separated args. Defaults to `--wire`. |
+| `KIMI_MODEL` | companion | Optional model label, recommended `kimi-for-coding` for Kimi Code. |
+| `KIMI_WORK_DIR` | companion | Working directory for the Kimi subprocess. Defaults to current directory. |
+| `KIMI_PERMISSION_MODE` | companion | Permission label for code jobs: `default`, `auto`, or `yolo`. |
+| `KIMI_EXECUTOR` | companion | Human-readable executor label stored in jobs. |
 | `KIMI_STATE_DIR` | `JobControl` | Directory for persisted job JSON files. |
 | `FAKE_KIMI_BEHAVIOR` | tests | Fake Kimi scenario. |
 | `FAKE_KIMI_DELAY_MS` | tests | Fake Kimi response delay. |
@@ -225,6 +244,15 @@ KIMI_COMMAND=node \
 KIMI_ARGS=tests/fixtures/fake-kimi.mjs \
 KIMI_STATE_DIR=/tmp/kimi-state \
 node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs setup
+```
+
+Example using Kimi Code executor settings:
+
+```bash
+KIMI_COMMAND=kimi-agent \
+KIMI_ARGS=--work-dir,/path/to/repo,--model,kimi-for-coding \
+KIMI_EXECUTOR=kimi-agent \
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs code "Implement the approved plan"
 ```
 
 ## Architecture

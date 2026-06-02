@@ -139,7 +139,7 @@ function installClaudeCode(dryRun) {
 
   console.log("   ✅ Claude Code adapter installed.");
   console.log(`   Reload with: /reload-plugins`);
-  console.log(`   Then run: /kimi:setup`);
+  console.log(`   Then run: /kimi:setup or /kimi:code`);
   return true;
 }
 
@@ -174,7 +174,7 @@ function installCodexCLI(dryRun) {
   );
 
   console.log("   ✅ Codex CLI adapter installed.");
-  console.log(`   Skills available: kimi-review, kimi-rescue, kimi-status`);
+  console.log(`   Skills available: kimi-review, kimi-rescue, kimi-code, kimi-status`);
   return true;
 }
 
@@ -217,7 +217,7 @@ function installAntigravityCLI(dryRun) {
   );
 
   console.log("   ✅ Antigravity CLI adapter installed.");
-  console.log(`   Workflows: kimi-setup, kimi-review, kimi-rescue, kimi-status, kimi-result, kimi-cancel`);
+  console.log(`   Workflows available: kimi-review, kimi-rescue, kimi-code, kimi-status`);
   return true;
 }
 
@@ -349,19 +349,19 @@ async function main() {
 
   let installed = 0;
 
-  if ((flags.all || flags.claude) && claude.installed) {
+  if ((flags.all || flags.claude) && (claude.installed || (flags.all && flags.dryRun))) {
     if (installClaudeCode(flags.dryRun)) installed++;
   } else if (flags.claude && !claude.installed) {
     console.log("\n⚠️  Claude Code not found. Skipping.");
   }
 
-  if ((flags.all || flags.codex) && codex.installed) {
+  if ((flags.all || flags.codex) && (codex.installed || (flags.all && flags.dryRun))) {
     if (installCodexCLI(flags.dryRun)) installed++;
   } else if (flags.codex && !codex.installed) {
     console.log("\n⚠️  Codex CLI not found. Skipping.");
   }
 
-  if ((flags.all || flags.antigravity) && antigravity.installed) {
+  if ((flags.all || flags.antigravity) && (antigravity.installed || (flags.all && flags.dryRun))) {
     if (installAntigravityCLI(flags.dryRun)) installed++;
   } else if (flags.antigravity && !antigravity.installed) {
     console.log("\n⚠️  Antigravity CLI not found. Skipping.");

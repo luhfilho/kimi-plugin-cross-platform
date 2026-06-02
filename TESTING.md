@@ -14,6 +14,9 @@ npm run test:integration
 
 # Adapter tests
 npm run test:adapters
+
+# Code executor integration scenario
+FAKE_KIMI_BEHAVIOR=code-json node --test tests/integration/companion.test.mjs
 ```
 
 ## Test Structure
@@ -33,6 +36,9 @@ The `tests/fixtures/fake-kimi.mjs` script mimics `kimi --wire` behavior:
   - `review-ok` — clean review
   - `review-findings` — structured findings
   - `task-complete` — task output
+  - `code-json` - structured implementation report
+  - `code-text` - plain text implementation report
+  - `approval-required` - emits an approval request before completing
   - `auth-required` — auth error
   - `cancel-mid` — requires cancel to finish
 

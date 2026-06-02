@@ -36,6 +36,10 @@ Markdown formatters for setup reports, review findings, task results, and status
 | Review | `review/start` | `prompt` + review template |
 | Events | `item/started`, `turn/completed` | `TurnBegin`, `TurnEnd`, `ContentPart` |
 
+## Planner/executor code flow
+
+For implementation work, the host CLI remains the planner and reviewer. The shared companion exposes `code` and `implement` commands that wrap a host-authored plan for Kimi Code, persist a `kind: "code"` job, parse Kimi's final report, and render changed files plus verification. Adapters expose this same capability through their native command, skill, agent, rule, or workflow format.
+
 ## Host Differences
 
 - **Claude Code**: Full feature set with native commands, agents, skills, and hooks
