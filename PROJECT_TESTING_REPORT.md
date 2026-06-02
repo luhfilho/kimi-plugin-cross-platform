@@ -1,150 +1,173 @@
-# Kimi Plugin Cross-Platform Kit — Relatório de Testes E2E
+# Kimi Plugin Cross-Platform Kit - Testing Report
 
-**Data**: 2026-05-28
-**Projeto de Teste**: Boletim Escolar (`/tmp/boletim-escolar`)
-**Status**: ✅ Todos os comandos testados com sucesso
+**Branch:** `bugfix/codex-startup-warnings`
+**Current focus:** Codex adapter startup hardening, test runner reliability, and
+self-contained e2e validation.
 
----
-
-## 1. Script de Instalação (`scripts/install.mjs`)
-
-### Funcionalidades
-- Detecção automática de CLIs instalados (Claude Code, Codex CLI, Antigravity CLI)
-- Instalação seletiva via `--claude`, `--codex`, `--antigravity`
-- Modo `--dry-run` para preview
-- `--uninstall` para remoção completa
-- Cópia automática dos core modules para o plugin
-
-### Instalações Realizadas
-| CLI | Status | Diretório |
-|-----|--------|-----------|
-| Claude Code | ✅ Instalado | `~/.claude/plugins/kimi` |
-| Codex CLI | ✅ Instalado | `~/.codex/` |
-| Antigravity CLI | ✅ Instalado (manual) | `~/.antigravity/` |
-
-### Bugfixes Aplicados
-- Path de import dos core modules corrigido de `../../core` para `../core`
-- Companion agora aceita `KIMI_COMMAND` e `KIMI_ARGS` via env
-- Companion agora aceita `KIMI_STATE_DIR` via env
+This report describes the current automated test surface. Older references to a
+fixed `/tmp/boletim-escolar` project are obsolete: the e2e script now creates an
+isolated temporary git fixture on each run.
 
 ---
 
-## 2. Projeto de Teste: Boletim Escolar
+## 1. Test Commands
 
-### Estrutura
-```
-/tmp/boletim-escolar/
-├── package.json
-├── server.js          # Backend Express + SQLite
-├── README.md
-└── public/
-    ├── index.html     # Frontend
-    └── app.js         # JS cliente
+```bash
+npm test
+npm run test:unit
+npm run test:integration
+npm run test:adapters
+node scripts/test-e2e.mjs
 ```
 
-### Vulnerabilidades Propositais (para testar review)
-1. **SQL Injection**: concatenação direta em queries SQLite
-2. **RCE via eval()**: endpoint `/api/admin/exec` executa código arbitrário
-3. **Hardcoded password**: `ADMIN_PASSWORD = 'admin123'`
-4. **CORS aberto**: `app.use(cors())` sem restrições
-5. **Timing attack**: comparação de token com `==` ao invés de `crypto.timingSafeEqual`
-6. **Divisão por zero**: média calculada sem verificar se há notas
-7. **Variáveis globais**: `global.alunosCache` polui namespace
+Single-file examples:
+
+```bash
+node --test tests/unit/wire-client.test.mjs
+node --test --test-name-pattern="classifyExit" tests/unit/test-e2e.test.mjs
+```
 
 ---
 
-## 3. Testes E2E Automatizados (Fake Kimi)
+## 2. Suite Coverage
 
-**Script**: `scripts/test-e2e.mjs`
-**Resultado**: ✅ 9/9 passaram
+| Suite | Command | Scope |
+|---|---|---|
+| Full local suite | `npm test` | Unit, integration, and adapter tests discovered by the custom runner |
+| Unit | `npm run test:unit` | Core runtime, runner behavior, and e2e helper behavior |
+| Integration | `npm run test:integration` | `kimi-companion.mjs` command-level integration checks |
+| Adapters | `npm run test:adapters` | Codex skill frontmatter and agent role metadata |
+| E2E | `node scripts/test-e2e.mjs` | Full companion flow with fake Kimi and temporary git fixture |
 
-| # | Comando | Saída Esperada | Status |
-|---|---------|---------------|--------|
-| 1 | `setup` | Versão do Kimi, protocolo 1.10, auth OK | ✅ |
-| 2 | `review` (sem mudanças) | "No changes to review." | ✅ |
-| 3 | `review` (com mudanças) | Review result com findings | ✅ |
-| 4 | `adversarial-review` | Review result adversarial | ✅ |
-| 5 | `task` | Task result com output | ✅ |
-| 6 | `status` | Tabela de jobs com IDs | ✅ |
-| 7 | `result --id=...` | Resultado do job específico | ✅ |
-| 8 | `cancel --id=nonexistent` | "Job not found." | ✅ |
+The custom runner in `scripts/run-tests.mjs` is intentionally kept. It walks
+directories and passes explicit `.test.` files to `node --test`, avoiding shell
+glob differences and preventing helper fixtures from being executed as tests.
 
 ---
 
-## 4. Testes com Kimi Real
+## 3. Fake Kimi Fixture
 
-### 4.1 Setup
-```bash
-$ kimi-companion.mjs setup
-```
-**Resultado**: ✅ Kimi CLI 1.45.0, autenticado, protocolo 1.10
+`tests/fixtures/fake-kimi.mjs` simulates `kimi --wire` without a network call or
+real Kimi authentication.
 
-### 4.2 Review (com auth-middleware.js)
-```bash
-$ kimi-companion.mjs review
-```
-**Resultado**: ✅ Encontrou 5 vulnerabilidades:
-- Token comparison não timing-safe (error)
-- Development fallback inseguro (error)
-- Secret token hardcoded (error)
-- Loose equality `==` (warning)
-- Authorization header mal parseado (warning)
+Supported scenarios:
 
-### 4.3 Task (análise de segurança)
-```bash
-$ kimi-companion.mjs task "List 3 potential security issues..."
-```
-**Resultado**: ✅ Encontrou exatamente as 3 vulnerabilidades críticas:
-1. SQL Injection em 4 endpoints
-2. RCE via `eval()` no endpoint admin
-3. Credenciais hardcoded com senha fraca
+- `review-ok`
+- `review-findings`
+- `task-complete`
+- `auth-required`
+- `network-error`
+- `slow`
+- `cancel-mid`
 
-### 4.4 Status
-```bash
-$ kimi-companion.mjs status
-```
-**Resultado**: ✅ Listou 10 jobs, incluindo 1 running (adversarial-review)
+Tests can tune behavior with:
 
-### 4.5 Result
 ```bash
-$ kimi-companion.mjs result --id=95ff43ce-...
+FAKE_KIMI_BEHAVIOR=review-findings
+FAKE_KIMI_DELAY_MS=5
 ```
-**Resultado**: ✅ Recuperou o JSON completo do review com 5 findings
-
-### 4.6 Cancel
-```bash
-$ kimi-companion.mjs cancel --id=8be0e35e-...
-```
-**Resultado**: ✅ Job cancelado com sucesso
-
-### 4.7 Adversarial Review
-```bash
-$ kimi-companion.mjs adversarial-review
-```
-**Resultado**: ⚠️ Timeout após 90s (o que é esperado para prompts mais longos e análise profunda)
 
 ---
 
-## 5. Descobertas e Ajustes
+## 4. E2E Script
 
-### Ajustes no Companion
-1. **Env vars**: Adicionado suporte a `KIMI_COMMAND`, `KIMI_ARGS`, `KIMI_STATE_DIR`
-2. **Core modules**: Install script agora copia `core/src/` para dentro do plugin
-3. **Path correction**: `CORE_SRC` ajustado para funcionar fora do repo
+`scripts/test-e2e.mjs` now:
 
-### Limitações Identificadas
-1. **Adversarial review** pode demorar mais que o timeout padrão
-2. **Cancel** requer ID completo (UUID), não aceita prefixo
-3. **Result** também requer ID completo
-4. Não há paginação no `status` para muitos jobs
+1. creates a temporary project directory with `mkdtempSync`;
+2. initializes a local git repository;
+3. configures a local git identity;
+4. commits a baseline fixture;
+5. runs companion commands with `KIMI_COMMAND=node` and
+   `KIMI_ARGS=tests/fixtures/fake-kimi.mjs`;
+6. classifies each command against an expected exit status;
+7. removes the temporary project and state directory.
+
+Covered e2e commands:
+
+- `setup`
+- `review` with no changes
+- `review` with changes
+- `adversarial-review`
+- `task`
+- `status`
+- `result`
+- `cancel --id=nonexistent` with expected exit `1`
+
+The e2e suite treats an unexpected non-zero exit as a failure. Expected failures,
+such as cancelling a nonexistent job, must declare `expectStatus`.
 
 ---
 
-## 6. Próximos Passos Recomendados
+## 5. Codex Adapter Regression Coverage
 
-1. Implementar broker lifecycle para warm-start do `kimi --wire`
-2. Adicionar timeout configurável nos comandos
-3. Permitir cancel/result com ID parcial (prefixo)
-4. Adicionar paginação no status
-5. Implementar review gate hook (Stop) para Claude Code
-6. Criar testes E2E para Codex CLI e Antigravity CLI adapters
+`tests/adapters/codex-adapter.test.mjs` guards the two Codex startup regressions
+that motivated this branch:
+
+- Kimi Codex skills must start with YAML frontmatter containing `name` and
+  `description`.
+- `kimi-delegate.toml` must use top-level `name`, `description`, and
+  `developer_instructions`; old `[agent]`, `[capabilities]`, and `[behavior]`
+  tables are rejected.
+
+These tests prevent the installer from reintroducing files that current Codex
+would skip or reject during startup.
+
+---
+
+## 6. CI Coverage
+
+`.github/workflows/ci.yml` runs on Node 20 and Node 22:
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run test:adapters
+```
+
+The e2e script is not part of CI in this branch. Run it locally before claiming
+end-to-end behavior is healthy.
+
+---
+
+## 7. Latest Local Verification
+
+Fresh verification during the documentation update:
+
+```text
+npm test
+# tests 47
+# pass 47
+# fail 0
+
+node scripts/test-e2e.mjs
+# Passed: 9
+# Failed: 0
+```
+
+Earlier verification for the Codex startup fix also showed:
+
+```text
+codex doctor
+13 ok · 1 idle · 2 notes · 0 warn · 0 fail
+```
+
+---
+
+## 8. Known Boundaries
+
+- Real Kimi network/auth integration is not exercised by automated tests.
+- E2E coverage uses fake Kimi, so it verifies host/runtime wiring and protocol
+  handling, not model quality.
+- Codex, Claude Code, and Antigravity host UIs are not driven directly in CI.
+- Optional local MCP server health is outside this repository; only the Codex
+  adapter metadata is covered here.
+
+---
+
+## 9. Maintenance Rules
+
+- Keep `scripts/run-tests.mjs`; do not replace it with shell globs.
+- Add new process-spawning tests with explicit cleanup.
+- Keep e2e fixture setup self-contained; do not depend on fixed directories
+  under `/tmp`.
+- Add adapter tests whenever host metadata formats change.

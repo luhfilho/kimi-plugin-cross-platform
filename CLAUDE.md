@@ -12,8 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm test                  # all tests (node --test via custom runner)
 npm run test:unit         # unit tests only (tests/unit/)
 npm run test:integration  # integration tests only (tests/integration/)
-npm run test:adapters     # adapter tests — NOTE: tests/adapters/ is empty, so this
-                          #   currently prints "No test files found." and exits 1
+npm run test:adapters     # adapter tests (tests/adapters/)
 
 # Run a single test FILE
 node --test tests/unit/wire-client.test.mjs
@@ -26,11 +25,11 @@ node scripts/install.mjs --dry-run  # preview install actions without writing
 ```
 
 - **Lint/format are NOT configured** — `npm run lint`/`npm run format` are placeholder `echo`s. Do not assume a linter exists.
-- **CI** (`.github/workflows/ci.yml`) runs `test:unit` + `test:integration` on Node 20 and 22. It does **not** run e2e or adapter tests.
+- **CI** (`.github/workflows/ci.yml`) runs `test:unit`, `test:integration`, and `test:adapters` on Node 20 and 22. It does **not** run e2e.
 
 ### Do not "simplify" the test runner
 
-`scripts/run-tests.mjs` is a hand-rolled runner that walks directories and passes explicit file paths to `node --test`. It exists specifically to work around **shell glob-expansion differences across platforms** — replacing it with `node --test tests/**/*.mjs` will break CI on some shells. Leave it in place.
+`scripts/run-tests.mjs` is a hand-rolled runner that walks directories and passes explicit test file paths to `node --test`. It exists specifically to work around **shell glob-expansion differences across platforms** and to avoid executing helper fixtures as top-level tests — replacing it with `node --test tests/**/*.mjs` will break CI on some shells. Leave it in place.
 
 ## Architecture
 
@@ -80,4 +79,4 @@ In source, `kimi-companion.mjs` imports core via `../../../../../core/src` (its 
 ## Repo notes
 
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
-- `codex-plugin-cc/` is a **separate, nested git repository** (the `openai/codex-plugin-cc` project) checked out inside this tree for reference. It is **not** part of this codebase — don't edit it as if it were.
+- `codex-plugin-cc/` was a separate nested checkout used for reference and has been removed from this workspace. Do not recreate or edit it as part of this codebase.

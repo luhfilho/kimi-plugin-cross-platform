@@ -1,176 +1,446 @@
 # Kimi Plugin Cross-Platform Kit
 
-A cross-platform plugin kit that integrates [Kimi CLI](https://www.moonshot.cn/) (Moonshot AI) into Claude Code, Codex CLI, and Antigravity CLI. Run code reviews, delegate rescue tasks, and manage background jobs — from whichever AI coding assistant you prefer.
+Cross-platform adapter kit for using the Kimi CLI from multiple AI coding
+assistants. The same host-agnostic Node.js runtime powers thin integrations for
+Claude Code, Codex CLI, and Antigravity CLI.
 
-[![Tests](https://github.com/luhfilho/kimi-plugin-cross-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/luhfilho/kimi-plugin-cross-platform/actions)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+Use it to:
 
----
+- run Kimi-backed reviews on local git changes;
+- delegate implementation or rescue tasks to Kimi;
+- keep background job state across assistant sessions;
+- install the same workflow into supported host CLIs without duplicating core
+  logic.
 
-## What You Get
+The package is pure Node.js ESM, targets Node 20+, uses npm workspaces, has no
+runtime dependencies, and has no build step.
 
-| Feature | Claude Code | Codex CLI | Antigravity CLI |
-|---------|-------------|-----------|-----------------|
-| Code Review | `/kimi:review` | `kimi-review` skill | `kimi-review` workflow |
-| Adversarial Review | `/kimi:adversarial-review` | — | — |
-| Task / Rescue | `/kimi:rescue` + agent | `kimi-rescue` skill | `kimi-rescue` workflow |
-| Job Status | `/kimi:status` | `kimi-status` skill | `kimi-status` workflow |
-| Job Result | `/kimi:result` | — | `kimi-result` workflow |
-| Job Cancel | `/kimi:cancel` | — | `kimi-cancel` workflow |
-| Setup Check | `/kimi:setup` | — | `kimi-setup` workflow |
+## Current Status
 
----
+- Version: `0.1.0`
+- Runtime: stable core modules under `core/src`
+- Hosts: Claude Code, Codex CLI, Antigravity CLI
+- Tests: unit, integration, adapter, and fake-Kimi e2e coverage
+- CI: Node 20 and 22 on GitHub Actions for unit, integration, and adapter tests
+
+Recent hardening in the unreleased branch:
+
+- Codex skills now include required `SKILL.md` YAML frontmatter.
+- Codex agent role metadata now matches current Codex schema.
+- The custom test runner ignores helper fixtures during directory scans.
+- The e2e script creates an isolated temporary git fixture and checks expected
+  exit codes explicitly.
 
 ## Requirements
 
-- **Node.js 20.0+**
-- **Kimi CLI 1.45.0+** (`npm install -g kimi-cli` or see [Moonshot](https://www.moonshot.cn/))
-- One or more of the supported host CLIs:
-  - [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview)
-  - [Codex CLI](https://github.com/openai/codex)
-  - [Antigravity CLI](https://antigravity.ai/)
+- Node.js `>=20.0.0`
+- npm
+- Git
+- Kimi CLI available as `kimi` for real use
+- At least one supported host CLI:
+  - Claude Code
+  - Codex CLI
+  - Antigravity CLI
 
----
+Tests do not require a real Kimi account or network access. They use
+`tests/fixtures/fake-kimi.mjs`.
 
 ## Quick Start
 
-### 1. Clone & Install
-
 ```bash
-git clone https://github.com/luhfilho/kimi-plugin-cross-platform.git
+git clone git@github.com:luhfilho/kimi-plugin-cross-platform.git
 cd kimi-plugin-cross-platform
-npm install        # if you want to run tests
+npm install
+
+# Preview installation
+node scripts/install.mjs --all --dry-run
+
+# Install adapters for detected CLIs
 node scripts/install.mjs --all
 ```
 
-### 2. Claude Code
-
-```
-/reload-plugins
-/kimi:setup
-```
-
-### 3. Codex CLI
+Selective install:
 
 ```bash
-codex --agent kimi-delegate
+node scripts/install.mjs --claude
+node scripts/install.mjs --codex
+node scripts/install.mjs --antigravity
 ```
 
-### 4. Antigravity CLI
+Uninstall:
 
 ```bash
-ag run kimi-setup
+node scripts/install.mjs --uninstall --all
+node scripts/install.mjs --uninstall --codex
 ```
 
----
+## What Gets Installed
 
-## Commands Reference
+| Host | Installed assets | Target |
+|---|---|---|
+| Claude Code | Plugin, commands, agent, skills, hooks, companion script, copied core runtime | `~/.claude/plugins/kimi` |
+| Codex CLI | Skills and `kimi-delegate` agent role | `~/.codex/skills`, `~/.codex/agents` |
+| Antigravity CLI | Rules, skills, workflows | `~/.antigravity` |
+
+The Claude Code installer also copies `core/src` into the installed plugin and
+rewrites the companion's core import path so it works outside this repository.
+
+## Host Workflows
+
+### Claude Code
+
+Installed slash commands:
+
+- `/kimi:setup`
+- `/kimi:review`
+- `/kimi:adversarial-review`
+- `/kimi:rescue`
+- `/kimi:status`
+- `/kimi:result`
+- `/kimi:cancel`
+
+The Claude Code plugin also includes:
+
+- `kimi-rescue` agent for delegated task execution;
+- `kimi-cli-runtime`, `kimi-prompting`, and `kimi-result-handling` skills;
+- a `SessionStart` hook that can run setup checks.
+
+### Codex CLI
+
+Installed Codex assets:
+
+- agent role: `kimi-delegate`
+- skills:
+  - `kimi-review`
+  - `kimi-rescue`
+  - `kimi-status`
+  - `kimi-prompting`
+
+Codex loads these from `~/.codex`. The role file must use top-level TOML fields
+`name`, `description`, and `developer_instructions`; the skill files must start
+with YAML frontmatter containing `name` and `description`.
+
+### Antigravity CLI
+
+Installed Antigravity assets:
+
+- rule: `kimi-plugin.md`
+- skills:
+  - `kimi-review`
+  - `kimi-rescue`
+  - `kimi-status`
+- workflows:
+  - `kimi-setup`
+  - `kimi-review`
+  - `kimi-rescue`
+  - `kimi-status`
+  - `kimi-result`
+  - `kimi-cancel`
+
+## Companion Commands
+
+All host adapters ultimately route to:
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs <command>
+```
+
+Supported commands:
 
 ### `setup`
-Checks whether Kimi CLI is installed, authenticated, and ready to use.
+
+Checks whether Kimi is available, whether `kimi --wire` can initialize, and
+prints a Markdown setup report.
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs setup
+```
 
 ### `review`
-Runs a read-only code review on uncommitted changes or a specific branch.
 
+Collects git changes and asks Kimi for structured JSON review output.
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs review
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs review --base=main
 ```
-/kimi:review              # review uncommitted changes
-/kimi:review --base=main  # review current branch vs main
-```
+
+If there are no changes, it prints `No changes to review.`
 
 ### `adversarial-review`
-Same as `review`, but Kimi is instructed to challenge assumptions, look for edge cases, and question design decisions.
 
-### `task` (rescue)
-Delegates an open-ended task to Kimi in the background.
+Same as `review`, but the prompt asks Kimi to challenge assumptions and look
+harder for edge cases.
 
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs adversarial-review
 ```
-/kimi:task "Refactor the auth module to use JWT tokens"
+
+### `task`
+
+Delegates a self-contained task prompt to Kimi and stores the result as a job.
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs task "Refactor the review parser"
 ```
 
 ### `status`
-Lists all jobs: running, finished, failed, or cancelled.
 
-### `result --id=<job-id>`
-Shows the full output of a completed job.
+Shows a Markdown snapshot of recent jobs.
 
-### `cancel --id=<job-id>`
-Cancels a running or queued job.
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs status
+```
 
----
+### `result`
+
+Prints the result for a finished, failed, or cancelled job.
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs result --id=<job-id>
+```
+
+### `cancel`
+
+Marks a running or queued job as cancelled.
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs cancel --id=<job-id>
+```
+
+## Environment Variables
+
+| Variable | Used by | Purpose |
+|---|---|---|
+| `KIMI_COMMAND` | companion, tests | Binary to spawn. Defaults to `kimi`. |
+| `KIMI_ARGS` | companion, tests | Comma-separated args. Defaults to `--wire`. |
+| `KIMI_STATE_DIR` | `JobControl` | Directory for persisted job JSON files. |
+| `FAKE_KIMI_BEHAVIOR` | tests | Fake Kimi scenario. |
+| `FAKE_KIMI_DELAY_MS` | tests | Fake Kimi response delay. |
+
+Example using the fixture manually:
+
+```bash
+KIMI_COMMAND=node \
+KIMI_ARGS=tests/fixtures/fake-kimi.mjs \
+KIMI_STATE_DIR=/tmp/kimi-state \
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs setup
+```
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Host CLI Layer                            │
-│  ┌──────────────┐ ┌────────────┐ ┌──────────────────────┐   │
-│  │ Claude Code  │ │ Codex CLI  │ │ Antigravity CLI      │   │
-│  │  (plugins)   │ │  (skills)  │ │ (rules/skills/flows) │   │
-│  └──────┬───────┘ └─────┬──────┘ └──────────┬───────────┘   │
-└─────────┼───────────────┼───────────────────┼───────────────┘
-          │               │                   │
-          └───────────────┴───────────────────┘
-                          │
-              ┌───────────▼────────────┐
-              │   kimi-companion.mjs   │
-              │   (CLI entry point)    │
-              └───────────┬────────────┘
-                          │
-          ┌───────────────┼───────────────┐
-          │               │               │
-   ┌──────▼──────┐ ┌──────▼──────┐ ┌─────▼─────┐
-   │ WireClient  │ │ JobControl  │ │ GitContext│
-   │(Kimi Wire)  │ │  (state)    │ │  (diffs)  │
-   └─────────────┘ └─────────────┘ └───────────┘
+The repository has two layers.
+
+```text
+core/src/          host-agnostic runtime logic
+adapters/<host>/   thin host wrappers, prompts, skills, rules, workflows
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for protocol details.
+Runtime modules:
 
----
+- `wire-client.mjs`: `WireClient`, JSON-RPC over stdio client for
+  `kimi --wire`. It extends `EventTarget` and provides an `.on()` convenience
+  method, but it is not a Node `EventEmitter`.
+- `job-control.mjs`: `JobControl`, file-backed job persistence under the user's
+  home directory or `KIMI_STATE_DIR`.
+- `git-context.mjs`: `GitContext`, review context collector for working-tree and
+  branch diffs, with truncation for large diffs.
+- `render.mjs`: pure Markdown renderers for setup reports, review results, task
+  results, and status snapshots.
+
+Data flow:
+
+```text
+host command
+  -> kimi-companion.mjs
+  -> GitContext, when review context is needed
+  -> JobControl, for persisted job state
+  -> WireClient, for Kimi Wire Protocol calls
+  -> render.mjs, for Markdown output back to the host
+```
+
+## Kimi Wire Protocol Notes
+
+Kimi Wire Protocol is JSON-RPC 2.0 over stdio. The runtime uses the protocol
+verbs available to Kimi CLI:
+
+- `initialize`
+- `prompt`
+- `steer`
+- `cancel`
+
+There is no native `review/start` method. Reviews are implemented as normal
+`prompt` calls containing a structured review request. The companion then parses
+JSON from the model response when available.
 
 ## Testing
 
+Run everything:
+
 ```bash
-npm test                  # all tests
-npm run test:unit         # unit tests only
-npm run test:integration  # integration tests only
+npm test
 ```
 
-34 tests, 0 failures. See [TESTING.md](TESTING.md) for details.
+Run focused suites:
 
----
+```bash
+npm run test:unit
+npm run test:integration
+npm run test:adapters
+node scripts/test-e2e.mjs
+```
+
+Run a single file:
+
+```bash
+node --test tests/unit/wire-client.test.mjs
+```
+
+Run a single test case:
+
+```bash
+node --test --test-name-pattern="classifyExit" tests/unit/test-e2e.test.mjs
+```
+
+The custom runner in `scripts/run-tests.mjs` intentionally walks directories and
+passes explicit test files to `node --test`. It exists to avoid shell glob
+differences across platforms. Do not replace it with a shell glob.
+
+Directory scans only include files with `.test.` in the filename, so helper
+fixtures such as `tests/fixtures/fake-kimi.mjs` are not executed as tests.
+
+### Fake Kimi Scenarios
+
+`tests/fixtures/fake-kimi.mjs` simulates `kimi --wire`.
+
+Supported scenarios:
+
+- `review-ok`
+- `review-findings`
+- `task-complete`
+- `auth-required`
+- `network-error`
+- `slow`
+- `cancel-mid`
+
+Example:
+
+```bash
+FAKE_KIMI_BEHAVIOR=review-findings \
+FAKE_KIMI_DELAY_MS=5 \
+node --test tests/unit/wire-client.test.mjs
+```
+
+## CI
+
+GitHub Actions runs on Node 20 and 22:
+
+- `npm run test:unit`
+- `npm run test:integration`
+- `npm run test:adapters`
+
+The e2e script is intentionally available locally but is not part of the CI
+workflow in this branch.
 
 ## Project Structure
 
-```
+```text
 .
-├── core/src/               # Core runtime (WireClient, JobControl, GitContext, Render)
-├── adapters/
-│   ├── claude-code/        # Claude Code plugin
-│   ├── codex-cli/          # Codex CLI skills & agents
-│   └── antigravity-cli/    # Antigravity CLI rules, skills, workflows
-├── scripts/
-│   ├── install.mjs         # Automated installer
-│   └── test-e2e.mjs        # End-to-end test suite
-├── tests/                  # Unit & integration tests
-└── docs/                   # Additional documentation
+|-- adapters/
+|   |-- antigravity-cli/
+|   |-- claude-code/
+|   `-- codex-cli/
+|-- core/
+|   `-- src/
+|-- docs/
+|-- scripts/
+|-- tests/
+|   |-- adapters/
+|   |-- fixtures/
+|   |-- integration/
+|   `-- unit/
+|-- AGENTS.md
+|-- CHANGELOG.md
+|-- PROJECT_MEMORY.md
+`-- README.md
 ```
 
+## Development Notes
+
+- Keep runtime behavior in `core/src`.
+- Keep adapters thin. They should hold host-specific commands, skills, prompts,
+  rules, workflows, and install layout.
+- Preserve `scripts/run-tests.mjs`; it is intentionally not a shell glob.
+- Process-spawning tests must clean up child processes. Open stdio pipes can keep
+  the Node test runner alive after assertions finish.
+- `codex-plugin-cc/` was a separate nested checkout used for reference. It is
+  not part of this project.
+
+## Troubleshooting
+
+### Codex skips Kimi skills
+
+Check that each installed `~/.codex/skills/kimi-*/SKILL.md` starts with:
+
+```markdown
 ---
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md).
-
+name: kimi-...
+description: ...
 ---
+```
 
-## Contributing
+Then restart Codex.
 
-See [CONTRIBUTORS.md](CONTRIBUTORS.md).
+### Codex ignores `kimi-delegate`
 
----
+Check `~/.codex/agents/kimi-delegate.toml`. It should define top-level fields,
+not `[agent]`, `[capabilities]`, or `[behavior]` tables:
+
+```toml
+name = "kimi-delegate"
+description = "Delegate work to Kimi CLI"
+
+developer_instructions = """
+Always formulate self-contained prompts for Kimi.
+Report job IDs and status to the user.
+Parse structured JSON review output when available.
+"""
+```
+
+### MCP startup warnings in Codex
+
+Codex may warn when optional MCP servers require missing environment variables.
+Either set the required secrets or disable those server blocks in
+`~/.codex/config.toml`.
+
+### `npm test` hangs
+
+Make sure `scripts/run-tests.mjs` filters directory scans to `*.test.*` files.
+Executing the fake Kimi fixture as a top-level test can leave the test run
+waiting on stdio.
+
+### Real Kimi is unavailable
+
+Run:
+
+```bash
+node adapters/claude-code/plugins/kimi/scripts/kimi-companion.mjs setup
+```
+
+For tests, use `KIMI_COMMAND=node` and `KIMI_ARGS=tests/fixtures/fake-kimi.mjs`
+instead of a real Kimi install.
+
+## Roadmap
+
+Tracked ideas:
+
+- broker lifecycle for a warm shared `kimi --wire` process;
+- review gate hook for blocking commits with findings;
+- real Kimi end-to-end integration tests;
+- partial job ID support for `cancel` and `result`;
+- configurable command timeouts;
+- status pagination for large job histories.
 
 ## License
 
-MIT © Luciano Filho
+MIT
