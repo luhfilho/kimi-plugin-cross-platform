@@ -36,3 +36,11 @@ test("Codex CLI exposes Kimi code skill and agent", () => {
   assert.equal(existsSync(join(ROOT, "adapters/codex-cli/skills/kimi-code/SKILL.md")), true);
   assert.equal(existsSync(join(ROOT, "adapters/codex-cli/agents/kimi-programmer.toml")), true);
 });
+
+test("Antigravity CLI exposes Kimi code skill and workflow", () => {
+  assert.equal(existsSync(join(ROOT, "adapters/antigravity-cli/skills/kimi-code/SKILL.md")), true);
+  assert.equal(existsSync(join(ROOT, "adapters/antigravity-cli/workflows/kimi-code.md")), true);
+  const rules = read("adapters/antigravity-cli/rules/kimi-plugin.md");
+  assert.match(rules, /planner/i);
+  assert.match(rules, /programmer/i);
+});
