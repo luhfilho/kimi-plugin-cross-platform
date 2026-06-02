@@ -71,7 +71,9 @@ Uninstall:
 
 ```bash
 node scripts/install.mjs --uninstall --all
+node scripts/install.mjs --uninstall --claude
 node scripts/install.mjs --uninstall --codex
+node scripts/install.mjs --uninstall --antigravity
 ```
 
 ## What Gets Installed

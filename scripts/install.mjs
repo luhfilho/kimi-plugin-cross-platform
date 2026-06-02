@@ -174,7 +174,7 @@ function installCodexCLI(dryRun) {
   );
 
   console.log("   ✅ Codex CLI adapter installed.");
-  console.log(`   Skills available: kimi-review, kimi-rescue, kimi-code, kimi-status`);
+  console.log(`   Skills available: kimi-review, kimi-rescue, kimi-code, kimi-status, kimi-prompting`);
   return true;
 }
 
@@ -277,50 +277,79 @@ Kimi Plugin Cross-Platform Kit — Installer
 Usage: node scripts/install.mjs [options]
 
 Options:
-  --all            Install for all detected CLIs (default)
+  --all            Install all detected CLIs, or uninstall all adapter artifacts (default)
   --claude         Install only for Claude Code
   --codex          Install only for Codex CLI
   --antigravity    Install only for Antigravity CLI
   --dry-run, -n    Show what would be done without making changes
-  --uninstall, -u  Remove installed plugins
+  --uninstall, -u  Remove selected adapter artifacts
   --help, -h       Show this help message
 
 Examples:
   node scripts/install.mjs --all
   node scripts/install.mjs --claude --dry-run
+  node scripts/install.mjs --uninstall --all
   node scripts/install.mjs --uninstall --codex
 `);
 }
 
-function uninstallAll(dryRun) {
+function getUninstallTargets() {
   const home = getHomeDir();
-  const targets = [
-    join(home, ".claude", "plugins", "kimi"),
-    join(home, ".codex", "agents", "kimi-delegate.toml"),
-    join(home, ".codex", "skills", "kimi-review"),
-    join(home, ".codex", "skills", "kimi-rescue"),
-    join(home, ".codex", "skills", "kimi-status"),
-    join(home, ".antigravity", "rules", "kimi-plugin.md"),
-    join(home, ".antigravity", "skills", "kimi-review"),
-    join(home, ".antigravity", "skills", "kimi-rescue"),
-    join(home, ".antigravity", "skills", "kimi-status"),
-    join(home, ".antigravity", "workflows", "kimi-setup.md"),
-    join(home, ".antigravity", "workflows", "kimi-review.md"),
-    join(home, ".antigravity", "workflows", "kimi-rescue.md"),
-    join(home, ".antigravity", "workflows", "kimi-status.md"),
-    join(home, ".antigravity", "workflows", "kimi-result.md"),
-    join(home, ".antigravity", "workflows", "kimi-cancel.md"),
-  ];
+  return {
+    claude: [
+      join(home, ".claude", "plugins", "kimi"),
+    ],
+    codex: [
+      join(home, ".codex", "agents", "kimi-delegate.toml"),
+      join(home, ".codex", "agents", "kimi-programmer.toml"),
+      join(home, ".codex", "skills", "kimi-review"),
+      join(home, ".codex", "skills", "kimi-rescue"),
+      join(home, ".codex", "skills", "kimi-code"),
+      join(home, ".codex", "skills", "kimi-status"),
+      join(home, ".codex", "skills", "kimi-prompting"),
+    ],
+    antigravity: [
+      join(home, ".antigravity", "rules", "kimi-plugin.md"),
+      join(home, ".antigravity", "skills", "kimi-review"),
+      join(home, ".antigravity", "skills", "kimi-rescue"),
+      join(home, ".antigravity", "skills", "kimi-code"),
+      join(home, ".antigravity", "skills", "kimi-status"),
+      join(home, ".antigravity", "workflows", "kimi-setup.md"),
+      join(home, ".antigravity", "workflows", "kimi-review.md"),
+      join(home, ".antigravity", "workflows", "kimi-rescue.md"),
+      join(home, ".antigravity", "workflows", "kimi-code.md"),
+      join(home, ".antigravity", "workflows", "kimi-status.md"),
+      join(home, ".antigravity", "workflows", "kimi-result.md"),
+      join(home, ".antigravity", "workflows", "kimi-cancel.md"),
+    ],
+  };
+}
+
+function getSelectedUninstallTargets(flags) {
+  const targetsByHost = getUninstallTargets();
+  if (flags.all) {
+    return Object.values(targetsByHost).flat();
+  }
+
+  const targets = [];
+  for (const host of ["claude", "codex", "antigravity"]) {
+    if (flags[host]) {
+      targets.push(...targetsByHost[host]);
+    }
+  }
+  return targets;
+}
+
+function uninstallSelected(dryRun, flags) {
+  const targets = getSelectedUninstallTargets(flags);
 
   console.log("\n🗑️  Uninstalling Kimi plugin...");
   for (const target of targets) {
-    if (existsSync(target)) {
-      if (dryRun) {
-        console.log(`  [DRY-RUN] Would remove: ${target}`);
-      } else {
-        rmSync(target, { recursive: true, force: true });
-        console.log(`  ✅ Removed: ${target}`);
-      }
+    if (dryRun) {
+      console.log(`  [DRY-RUN] Would remove if present: ${target}`);
+    } else if (existsSync(target)) {
+      rmSync(target, { recursive: true, force: true });
+      console.log(`  ✅ Removed: ${target}`);
     }
   }
   console.log("\n   ✅ Uninstall complete.");
@@ -334,7 +363,7 @@ async function main() {
   console.log("╚══════════════════════════════════════════════════════════════════╝");
 
   if (flags.uninstall) {
-    uninstallAll(flags.dryRun);
+    uninstallSelected(flags.dryRun, flags);
     return;
   }
 
