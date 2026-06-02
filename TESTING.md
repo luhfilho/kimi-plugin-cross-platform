@@ -21,7 +21,7 @@ FAKE_KIMI_BEHAVIOR=code-json node --test tests/integration/companion.test.mjs
 
 ## Test Structure
 
-- `tests/unit/` — Unit tests for core modules (wire-client, job-control, git-context, render)
+- `tests/unit/` — Unit tests for core modules and scripts (wire-client, job-control, git-context, render, installer)
 - `tests/integration/` — Integration tests for the companion script
 - `tests/fixtures/` — Fake Kimi CLI server for testing
 
