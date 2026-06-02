@@ -1,6 +1,7 @@
 export const VALID_VERIFICATION_STATUSES = ["passed", "failed", "not_run"];
 
 const VALID_VERIFICATION_STATUS_SET = new Set(VALID_VERIFICATION_STATUSES);
+const CODE_RESULT_KEYS = ["summary", "changed_files", "changedFiles", "verification", "follow_up", "followUp"];
 
 export function buildCodePrompt({ plan, worktreeRoot }) {
   const outputContract = {
@@ -65,14 +66,17 @@ function parseStructuredOutput(text) {
     return direct;
   }
 
+  const candidates = [];
+
   for (const fenced of extractFencedBlocks(trimmed)) {
     const parsed = tryParseJsonObject(fenced.trim());
     if (parsed) {
-      return parsed;
+      candidates.push(parsed);
     }
   }
 
-  return parseFirstObjectSubstring(trimmed);
+  candidates.push(...parseObjectSubstrings(trimmed));
+  return selectJsonCandidate(candidates);
 }
 
 function tryParseJsonObject(value) {
@@ -96,7 +100,9 @@ function extractFencedBlocks(text) {
   return blocks;
 }
 
-function parseFirstObjectSubstring(text) {
+function parseObjectSubstrings(text) {
+  const candidates = [];
+
   for (let start = 0; start < text.length; start += 1) {
     if (text[start] !== "{") {
       continue;
@@ -109,11 +115,29 @@ function parseFirstObjectSubstring(text) {
 
     const parsed = tryParseJsonObject(text.slice(start, end + 1));
     if (parsed) {
-      return parsed;
+      candidates.push(parsed);
     }
   }
 
-  return null;
+  return candidates;
+}
+
+function selectJsonCandidate(candidates) {
+  let firstCandidate = null;
+  let lastContractCandidate = null;
+
+  for (const candidate of candidates) {
+    firstCandidate ??= candidate;
+    if (isCodeResultShape(candidate)) {
+      lastContractCandidate = candidate;
+    }
+  }
+
+  return lastContractCandidate ?? firstCandidate;
+}
+
+function isCodeResultShape(value) {
+  return CODE_RESULT_KEYS.some((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
 
 function findBalancedObjectEnd(text, start) {

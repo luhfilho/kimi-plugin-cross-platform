@@ -51,6 +51,20 @@ test("parseCodeResult extracts JSON from fenced output", () => {
   assert.deepEqual(parsed.followUp, []);
 });
 
+test("parseCodeResult prefers result JSON over earlier unrelated objects", () => {
+  const parsed = parseCodeResult([
+    "Metadata:",
+    "{\"example\":{\"kind\":\"metadata\"}}",
+    "Final report:",
+    "{\"summary\":\"Done\",\"changed_files\":[\"core/src/code-result.mjs\"],\"verification\":[],\"follow_up\":[]}",
+  ].join("\n"));
+
+  assert.equal(parsed.summary, "Done");
+  assert.deepEqual(parsed.changedFiles, ["core/src/code-result.mjs"]);
+  assert.deepEqual(parsed.verification, []);
+  assert.deepEqual(parsed.followUp, []);
+});
+
 test("parseCodeResult preserves plain text as raw fallback", () => {
   const parsed = parseCodeResult("Implemented the change and tests passed.");
 
