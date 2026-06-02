@@ -54,6 +54,49 @@ export function renderTaskResult({ status, output, error }) {
   return lines.join("\n");
 }
 
+export function renderCodeResult({ status, summary, changedFiles = [], verification = [], followUp = [], raw, error }) {
+  if (error) {
+    return `## Code Result (failed)\n\n\`\`\`\n${error}\n\`\`\``;
+  }
+
+  const lines = [`## Code Result (${status})`, ""];
+  if (summary) {
+    lines.push(summary, "");
+  }
+
+  if (changedFiles.length > 0) {
+    lines.push("### Changed Files");
+    for (const file of changedFiles) {
+      lines.push(`- \`${file}\``);
+    }
+    lines.push("");
+  }
+
+  if (verification.length > 0) {
+    lines.push("### Verification");
+    lines.push("| Command | Status | Notes |");
+    lines.push("|---|---|---|");
+    for (const item of verification) {
+      lines.push(`| \`${item.command || ""}\` | ${item.status || "not_run"} | ${item.notes || ""} |`);
+    }
+    lines.push("");
+  }
+
+  if (followUp.length > 0) {
+    lines.push("### Follow Up");
+    for (const item of followUp) {
+      lines.push(`- ${item}`);
+    }
+    lines.push("");
+  }
+
+  if (raw) {
+    lines.push("### Raw Output", "", "```", raw, "```");
+  }
+
+  return lines.join("\n");
+}
+
 export function renderStatusSnapshot({ running, latestFinished, recent, total }) {
   const lines = ["## Kimi Plugin Status", ""];
   lines.push(`**Total jobs**: ${total}`);
